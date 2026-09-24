@@ -1,0 +1,77 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-create-question-table
+      author: safiya
+      comment: QUESTION = one question in the bank, belongs to a TEMPLATE. validation/options carry per-question config as JSONB. visibility_rule decides if the question is rendered at all; disable_rule keeps it visible but non-interactive - two separate rules since they answer different questions.
+
+      changes:
+        - createTable:
+            tableName: question
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_question
+                    nullable: false
+
+              - column:
+                  name: answer_key
+                  type: VARCHAR
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_question_answer_key
+
+              - column:
+                  name: text
+                  type: TEXT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: type
+                  type: question_type
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: template_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_question_template
+                    references: template(id)
+
+              - column:
+                  name: display_order
+                  type: INTEGER
+
+              - column:
+                  name: validation
+                  type: JSONB
+
+              - column:
+                  name: options
+                  type: JSONB
+
+              - column:
+                  name: visibility_rule
+                  type: JSONB
+
+              - column:
+                  name: disable_rule
+                  type: JSONB
+
+        - createIndex:
+            indexName: idx_question_template_id
+            tableName: question
+            columns:
+              - column:
+                  name: template_id
+
+      rollback:
+        - dropTable:
+            tableName: question

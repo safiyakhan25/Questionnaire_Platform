@@ -1,0 +1,101 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-create-question-response-table
+      author: safiya
+      comment: QUESTION_RESPONSE = the raw transcript. Append-only audit log of every answer ever given, never updated or deleted. template_id is denormalized from question.template_id so responses for a template can be queried without joining through question. relationship_instance_id disambiguates repeated family-member instances (null = the proband answered this).
+
+      changes:
+        - createTable:
+            tableName: question_response
+            columns:
+              - column:
+                  name: response_id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_question_response
+                    nullable: false
+
+              - column:
+                  name: session_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_question_response_session
+                    references: questionnaire_session(session_id)
+
+              - column:
+                  name: question_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_question_response_question
+                    references: question(id)
+
+              - column:
+                  name: template_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_question_response_template
+                    references: template(id)
+
+              - column:
+                  name: answer_key
+                  type: VARCHAR
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: relationship_instance_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_question_response_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: answer_type
+                  type: answer_type
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: answer_value
+                  type: JSONB
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            indexName: idx_question_response_session_question
+            tableName: question_response
+            columns:
+              - column:
+                  name: session_id
+              - column:
+                  name: question_id
+
+        - createIndex:
+            indexName: idx_question_response_template_id
+            tableName: question_response
+            columns:
+              - column:
+                  name: template_id
+
+        - createIndex:
+            indexName: idx_question_response_relationship_instance_id
+            tableName: question_response
+            columns:
+              - column:
+                  name: relationship_instance_id
+
+      rollback:
+        - dropTable:
+            tableName: question_response

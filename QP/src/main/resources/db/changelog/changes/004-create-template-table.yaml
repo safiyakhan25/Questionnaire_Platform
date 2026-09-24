@@ -1,0 +1,77 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-create-template-table
+      author: safiya
+      comment: TEMPLATE = a reusable question set inside a workflow (e.g. one "Family Member" template reused for mother, father, siblings...). Sits between WORKFLOW and QUESTION. Within a workflow, the lowest display_order template is the default/entry template; later templates are gated by template_rule.
+
+      changes:
+        - createTable:
+            tableName: template
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_template
+                    nullable: false
+
+              - column:
+                  name: workflow_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_template_workflow
+                    references: workflow(id)
+
+              - column:
+                  name: code
+                  type: VARCHAR
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_template_code
+
+              - column:
+                  name: name
+                  type: VARCHAR
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: description
+                  type: TEXT
+
+              - column:
+                  name: display_order
+                  type: INTEGER
+
+              - column:
+                  name: template_rule
+                  type: JSONB
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            indexName: idx_template_workflow_id
+            tableName: template
+            columns:
+              - column:
+                  name: workflow_id
+
+      rollback:
+        - dropTable:
+            tableName: template

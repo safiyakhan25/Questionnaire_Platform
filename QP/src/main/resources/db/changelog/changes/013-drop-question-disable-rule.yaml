@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-drop-question-disable-rule
+      author: safiya
+      comment: A question's rule may only reference an earlier template's answer_keys, never its own template's (FR-11) - so nothing in a currently-rendered template can ever change as a result of answering another question in that same template. That made disable_rule (and the re-evaluation it implied) unreachable in practice. Only visibility_rule remains.
+
+      changes:
+        - dropColumn:
+            tableName: question
+            columnName: disable_rule
+
+      rollback:
+        - addColumn:
+            tableName: question
+            columns:
+              - column:
+                  name: disable_rule
+                  type: JSONB

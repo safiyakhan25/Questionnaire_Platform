@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-add-display-order-unique-constraints
+      author: safiya
+      comment: display_order must be unique within its parent scope - the "lowest display_order is the default/entry template" rule (and the equivalent for workflow/question ordering) is only well-defined if there are no ties.
+
+      changes:
+        - addUniqueConstraint:
+            tableName: workflow
+            columnNames: display_order
+            constraintName: uk_workflow_display_order
+
+        - addUniqueConstraint:
+            tableName: template
+            columnNames: workflow_id, display_order
+            constraintName: uk_template_workflow_display_order
+
+        - addUniqueConstraint:
+            tableName: question
+            columnNames: template_id, display_order
+            constraintName: uk_question_template_display_order
+
+      rollback:
+        - dropUniqueConstraint:
+            tableName: workflow
+            constraintName: uk_workflow_display_order
+
+        - dropUniqueConstraint:
+            tableName: template
+            constraintName: uk_template_workflow_display_order
+
+        - dropUniqueConstraint:
+            tableName: question
+            constraintName: uk_question_template_display_order

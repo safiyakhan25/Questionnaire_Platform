@@ -1,0 +1,119 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-create-person-table
+      author: safiya
+      comment: PERSON = the proband (the patient the whole assessment is about). One row per patient. additional_facts is a flexible JSONB bucket for collected facts that don't map onto a fixed column.
+
+      changes:
+        - createTable:
+            tableName: person
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_person
+                    nullable: false
+
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: first_name
+                  type: VARCHAR
+
+              - column:
+                  name: middle_name
+                  type: VARCHAR
+
+              - column:
+                  name: last_name
+                  type: VARCHAR
+
+              - column:
+                  name: preferred_name
+                  type: VARCHAR
+
+              - column:
+                  name: gender_at_birth
+                  type: gender_at_birth_type
+
+              - column:
+                  name: gender_identity
+                  type: VARCHAR
+
+              - column:
+                  name: birth_date
+                  type: TIMESTAMP
+
+              - column:
+                  name: marital_status
+                  type: VARCHAR
+
+              - column:
+                  name: communication_language
+                  type: VARCHAR
+
+              - column:
+                  name: race
+                  type: TEXT[]
+
+              - column:
+                  name: ethnicity
+                  type: TEXT[]
+
+              - column:
+                  name: blood_type
+                  type: VARCHAR
+
+              - column:
+                  name: deceased
+                  type: BOOLEAN
+
+              - column:
+                  name: deceased_date_time
+                  type: TIMESTAMP
+
+              - column:
+                  name: age
+                  type: INTEGER
+
+              - column:
+                  name: contact
+                  type: JSONB
+
+              - column:
+                  name: primary_contact
+                  type: VARCHAR
+
+              - column:
+                  name: address
+                  type: JSONB
+
+              - column:
+                  name: additional_facts
+                  type: JSONB
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+      rollback:
+        - dropTable:
+            tableName: person

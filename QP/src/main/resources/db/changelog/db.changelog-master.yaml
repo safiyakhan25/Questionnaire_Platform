@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-create-extensions.yaml
+  - include:
+      file: db/changelog/changes/002-create-enum-types.yaml
+  - include:
+      file: db/changelog/changes/003-create-workflow-table.yaml
+  - include:
+      file: db/changelog/changes/004-create-template-table.yaml
+  - include:
+      file: db/changelog/changes/005-create-question-table.yaml
+  - include:
+      file: db/changelog/changes/006-create-person-table.yaml
+  - include:
+      file: db/changelog/changes/007-create-family-member-table.yaml
+  - include:
+      file: db/changelog/changes/008-create-questionnaire-session-table.yaml
+  - include:
+      file: db/changelog/changes/009-create-question-response-table.yaml
+  - include:
+      file: db/changelog/changes/010-create-disease-table.yaml
+  - include:
+      file: db/changelog/changes/011-create-mutation-table.yaml
+  - include:
+      file: db/changelog/changes/012-add-display-order-unique-constraints.yaml
+  - include:
+      file: db/changelog/changes/013-drop-question-disable-rule.yaml

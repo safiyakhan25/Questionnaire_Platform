@@ -1,0 +1,252 @@
+QUESTIONNAIRE PLATFORM — POST-HLD CURRENT CONTEXT
+
+IMPORTANT:
+The attached HLD and previous documents are historical/reference documents.
+Do not assume that every implementation detail in them is still current.
+
+The HLD must remain unchanged.
+
+The following decisions were finalized after the HLD and previous documents were created.
+These decisions represent the current implementation direction and take precedence over older descriptions wherever there is a conflict.
+
+1. FORM-BASED QUESTIONNAIRE
+
+The platform will not be chat-based.
+
+The questionnaire is form-based.
+
+When a template is loaded, the backend returns the questions belonging to that template, and the client renders them as a form.
+
+The client remains a thin interface and does not contain business logic.
+
+The backend determines which questions are applicable.
+
+2. WORKFLOW AND TEMPLATE STRUCTURE
+
+A workflow can contain multiple templates.
+
+Each workflow has one default template.
+
+The default template is loaded first.
+
+After a template is completed, the Workflow Engine determines the next template.
+
+The next template has a template-level rule associated with it.
+
+The Workflow Engine invokes the Rule Engine to evaluate that rule.
+
+If the rule evaluates to TRUE:
+    Load the template.
+
+If the rule evaluates to FALSE:
+    Skip the template and evaluate the next template.
+
+Therefore template rules control TEMPLATE NAVIGATION, not individual question visibility.
+
+3. QUESTION RULES
+
+Questions inside a template can also have rules.
+
+Question rules determine whether an individual question should be displayed.
+
+Therefore there are two levels of rule evaluation:
+
+Template Rule:
+    Determines whether a template should be loaded or skipped.
+
+Question Rule:
+    Determines whether a question inside the currently loaded template should be displayed.
+
+The same JSONLogic Rule Engine is used for both.
+
+4. SAME JSONLOGIC ENGINE
+
+There is one generic JSONLogic Rule Engine.
+
+It is not aware of questionnaire-specific navigation.
+
+It only:
+    Parse the JSONLogic expression
+    Retrieve required values from the supplied business entity
+    Evaluate the condition
+    Return TRUE or FALSE
+
+The Workflow Engine interprets the result for template navigation.
+
+The question/form handling logic interprets the result for question visibility.
+
+5. BUSINESS DATA IS THE SOURCE OF TRUTH
+
+Rules are evaluated against the latest business entities, not directly against QUESTION_RESPONSE.
+
+Questionnaire answers are first persisted and mapped to the relevant business entity.
+
+The latest business entity state is then used when rules require those values.
+
+The answer_key is the business identifier used by a rule to retrieve a value.
+
+The Rule Engine does not decide whether the value comes from PERSON or FAMILY_MEMBER.
+
+The Workflow Engine provides the current entity/context.
+
+6. ANSWER FLOW
+
+When the user changes an answer:
+
+    User changes answer
+          ↓
+    REST API
+          ↓
+    Persist QUESTION_RESPONSE
+          ↓
+    Update corresponding business entity
+          ↓
+    Business entity becomes current source of truth
+          ↓
+    Evaluate affected question rules
+          ↓
+    Refresh affected parts of the form
+
+The system should NOT blindly evaluate every question rule after every answer change.
+
+Only rules that depend on the changed answer should need to be reconsidered.
+
+7. TEMPLATE COMPLETION
+
+When all required questions in the current template are completed:
+
+    Submit template
+          ↓
+    Workflow Engine identifies next template
+          ↓
+    Evaluate next template rule
+          ↓
+    TRUE  → Load template
+    FALSE → Skip template
+          ↓
+    Continue with next template
+
+Template rules are therefore evaluated when the workflow reaches the point where that template could become the next template.
+
+8. RULE EVALUATION TIMING
+
+Question rules are evaluated for the currently loaded form.
+
+They are not all evaluated before the template is loaded.
+
+The template itself must first be selected.
+
+Once the template is loaded, its questions are available and their visibility rules can be evaluated.
+
+Template rules are evaluated when determining whether a template should be loaded.
+
+9. RULE STORAGE
+
+Rules are configuration rather than hardcoded business logic.
+
+The current design stores rule expressions as JSONB in the database.
+
+The QUESTION_RULE expression therefore contains the JSONLogic rule that is evaluated at runtime.
+
+10. DATABASE
+
+PostgreSQL is the database.
+
+Liquibase is being used for database schema management and seed data.
+
+The schema should be created and versioned through Liquibase rather than relying on Hibernate to create the schema.
+
+11. CURRENT DATA MODEL
+
+The current data model includes the questionnaire/workflow configuration as well as business and response data.
+
+Important concepts include:
+
+WORKFLOW
+TEMPLATE
+QUESTION
+QUESTION_RULE
+QUESTION_RESPONSE
+QUESTIONNAIRE_SESSION
+PERSON
+FAMILY_MEMBER
+DISEASE
+MUTATION
+
+The exact current schema should be taken from the latest data-model diagram rather than assuming that the older HLD's six-table description is still the complete implementation model.
+
+12. CURRENT IMPLEMENTATION SCOPE
+
+The implementation is being built incrementally.
+
+The initial implementation is focused on establishing the database layer, Liquibase migrations and seed data, REST APIs, questionnaire configuration, workflow/template/question handling, response persistence, and JSONLogic rule evaluation.
+
+The architecture should remain extensible for future workflows and assessment capabilities.
+
+13. ARCHITECTURAL RESPONSIBILITIES
+
+REST API:
+    Handles communication with clients.
+
+Workflow Engine:
+    Controls workflow and template navigation.
+
+Template Engine:
+    Loads the appropriate template and its questions.
+
+Rule Engine:
+    Evaluates JSONLogic and returns TRUE/FALSE.
+
+Persistence Layer:
+    Stores questionnaire responses, sessions, configuration and business data.
+
+Client:
+    Renders forms and collects user input.
+    It must not make business decisions.
+
+14. IMPORTANT DISTINCTION
+
+Do not merge these concepts:
+
+Template selection:
+    Workflow Engine + Template Rule
+
+Question visibility:
+    Question Rule + current template
+
+Rule evaluation:
+    JSONLogic Rule Engine
+
+Data persistence:
+    Persistence Layer
+
+Business data:
+    PERSON / FAMILY_MEMBER and other business entities
+
+QUESTION_RESPONSE:
+    Records questionnaire answers but is not the primary source used for subsequent rule evaluation.
+
+15. HANDLING CONFLICTS WITH OLDER DOCUMENTS
+
+If the HLD or an older document describes:
+
+    CLI next-question interaction
+    chat-style questionnaire behaviour
+    one template per workflow
+    rules stored only in external files
+    rules being evaluated directly against QUESTION_RESPONSE
+    Rule Engine controlling navigation
+
+do not treat those descriptions as the current implementation.
+
+They represent the earlier design.
+
+Use the post-HLD decisions in this document as the current implementation context.
+
+However, do not rewrite or claim that the original HLD has been changed.
+
+When explaining a discrepancy, explicitly identify it as:
+
+"Original HLD behaviour"
+versus
+"Post-HLD finalized implementation decision".

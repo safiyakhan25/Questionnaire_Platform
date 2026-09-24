@@ -1,0 +1,133 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-create-family-member-table
+      author: safiya
+      comment: FAMILY_MEMBER = a relative reported by the proband. Only relationship_type/maternal_paternal_side are required - family history is always incomplete, so every other field stays nullable.
+
+      changes:
+        - createTable:
+            tableName: family_member
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_family_member
+                    nullable: false
+
+              - column:
+                  name: proband_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_family_member_person
+                    references: person(id)
+
+              - column:
+                  name: relationship_type
+                  type: relationship_type
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: maternal_paternal_side
+                  type: maternal_paternal_side_type
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: first_name
+                  type: VARCHAR
+
+              - column:
+                  name: middle_name
+                  type: VARCHAR
+
+              - column:
+                  name: last_name
+                  type: VARCHAR
+
+              - column:
+                  name: preferred_name
+                  type: VARCHAR
+
+              - column:
+                  name: gender_at_birth
+                  type: gender_at_birth_type
+
+              - column:
+                  name: gender_identity
+                  type: VARCHAR
+
+              - column:
+                  name: birth_date
+                  type: TIMESTAMP
+
+              - column:
+                  name: marital_status
+                  type: VARCHAR
+
+              - column:
+                  name: communication_language
+                  type: VARCHAR
+
+              - column:
+                  name: race
+                  type: TEXT[]
+
+              - column:
+                  name: ethnicity
+                  type: TEXT[]
+
+              - column:
+                  name: blood_type
+                  type: VARCHAR
+
+              - column:
+                  name: deceased
+                  type: BOOLEAN
+
+              - column:
+                  name: deceased_date_time
+                  type: TIMESTAMP
+
+              - column:
+                  name: age
+                  type: INTEGER
+
+              - column:
+                  name: contact
+                  type: JSONB
+
+              - column:
+                  name: primary_contact
+                  type: VARCHAR
+
+              - column:
+                  name: address
+                  type: JSONB
+
+              - column:
+                  name: additional_facts
+                  type: JSONB
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+
+        - createIndex:
+            indexName: idx_family_member_proband_id
+            tableName: family_member
+            columns:
+              - column:
+                  name: proband_id
+
+      rollback:
+        - dropTable:
+            tableName: family_member

@@ -1,0 +1,57 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-create-workflow-table
+      author: safiya
+      comment: WORKFLOW = a questionnaire section, e.g. "Personal Details".
+      changes:
+        - createTable:
+            tableName: workflow
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_workflow
+                    nullable: false
+
+              - column:
+                  name: code
+                  type: VARCHAR
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_workflow_code
+
+              - column:
+                  name: name
+                  type: VARCHAR
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: description
+                  type: TEXT
+
+              - column:
+                  name: display_order
+                  type: INTEGER
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+      rollback:
+        - dropTable:
+            tableName: workflow

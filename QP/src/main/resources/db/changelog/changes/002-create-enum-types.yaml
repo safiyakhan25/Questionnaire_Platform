@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-create-enum-types
+      author: safiya
+      comment: Fixed-vocabulary fields from the data model's ENUM Definitions appendix.
+      changes:
+        - sql:
+            sql: |
+              CREATE TYPE question_type AS ENUM ('TEXT', 'NUMBER', 'DATE', 'RADIO', 'CHECKBOX', 'DROPDOWN');
+              CREATE TYPE session_status AS ENUM ('IN_PROGRESS', 'COMPLETED');
+              CREATE TYPE answer_type AS ENUM ('BOOLEAN', 'NUMBER', 'STRING', 'ARRAY', 'OBJECT');
+              CREATE TYPE gender_at_birth_type AS ENUM ('MALE', 'FEMALE', 'INTERSEX', 'UNKNOWN');
+              CREATE TYPE maternal_paternal_side_type AS ENUM ('MATERNAL', 'PATERNAL', 'UNKNOWN');
+              CREATE TYPE relationship_type AS ENUM (
+                  'MOTHER', 'FATHER', 'BROTHER', 'SISTER', 'SON', 'DAUGHTER', 'SPOUSE',
+                  'HALF_BROTHER', 'HALF_SISTER', 'ADOPTED_SON', 'ADOPTED_DAUGHTER',
+                  'GRANDFATHER', 'GRANDMOTHER', 'UNCLE', 'AUNT', 'COUSIN', 'NIECE', 'NEPHEW'
+              );
+      rollback:
+        - sql:
+            sql: |
+              DROP TYPE IF EXISTS relationship_type;
+              DROP TYPE IF EXISTS maternal_paternal_side_type;
+              DROP TYPE IF EXISTS gender_at_birth_type;
+              DROP TYPE IF EXISTS answer_type;
+              DROP TYPE IF EXISTS session_status;
+              DROP TYPE IF EXISTS question_type;
