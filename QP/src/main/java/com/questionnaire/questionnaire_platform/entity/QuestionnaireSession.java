@@ -31,7 +31,9 @@ public class QuestionnaireSession {
     @Column(nullable = false)
     private SessionStatus status;
 
-    // Where this session currently is, for resume. Null until the Workflow Engine resolves the first template.
+    // Where the PROBAND's own walk currently is, for resume - never touched by a family member's
+    // pass (each FamilyMember owns its own currentTemplate/currentWorkflow instead, see
+    // FamilyMember.java). Null until the Workflow Engine resolves the first template.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "previous_template_id")
     private Template previousTemplate;

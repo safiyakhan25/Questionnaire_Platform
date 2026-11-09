@@ -1,0 +1,166 @@
+databaseChangeLog:
+  - changeSet:
+      id: 025-create-assisted-reproduction-enum-types
+      author: safiya
+      comment: Controlled vocabularies for ASSISTED_REPRODUCTION/ASSISTED_REPRODUCTION_PARTICIPANT, per QP-Pedigree-Schema-Design.md §2.9.
+      changes:
+        - sql:
+            sql: |
+              CREATE TYPE assisted_reproduction_type AS ENUM (
+                  'DONOR', 'SPERM_DONOR', 'EGG_DONOR', 'GESTATIONAL_CARRIER', 'SURROGATE',
+                  'INTENDED_PARENT', 'IVF', 'IUI', 'ICSI', 'EMBRYO_ADOPTION', 'ANONYMOUS_DONOR'
+              );
+              CREATE TYPE assisted_reproduction_participant_role AS ENUM (
+                  'EGG_DONOR', 'SPERM_DONOR', 'GESTATIONAL_CARRIER', 'INTENDED_PARENT', 'DONATED_TO', 'CARRIED_FOR'
+              );
+      rollback:
+        - sql:
+            sql: |
+              DROP TYPE IF EXISTS assisted_reproduction_participant_role;
+              DROP TYPE IF EXISTS assisted_reproduction_type;
+
+  - changeSet:
+      id: 025-create-assisted-reproduction-table
+      author: safiya
+      comment: >
+        One row per individual with an assisted-reproduction record. Maps to
+        individual.assistedReproduction (pedigree_schema.json).
+      changes:
+        - createTable:
+            tableName: assisted_reproduction
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_assisted_reproduction
+                    nullable: false
+
+              - column:
+                  name: proband_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_assisted_reproduction_proband
+                    references: person(id)
+
+              - column:
+                  name: individual_person_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_assisted_reproduction_individual_person
+                    references: person(id)
+
+              - column:
+                  name: individual_family_member_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_assisted_reproduction_individual_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: reproduction_type
+                  type: assisted_reproduction_type
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: anonymous
+                  type: BOOLEAN
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - sql:
+            sql: |
+              ALTER TABLE assisted_reproduction
+              ADD CONSTRAINT chk_assisted_reproduction_individual_xor
+              CHECK (
+                (individual_person_id IS NOT NULL AND individual_family_member_id IS NULL) OR
+                (individual_person_id IS NULL AND individual_family_member_id IS NOT NULL)
+              );
+
+        - createIndex:
+            indexName: idx_assisted_reproduction_proband_id
+            tableName: assisted_reproduction
+            columns:
+              - column:
+                  name: proband_id
+
+      rollback:
+        - dropTable:
+            tableName: assisted_reproduction
+
+  - changeSet:
+      id: 025-create-assisted-reproduction-participant-table
+      author: safiya
+      comment: >
+        Flattens assistedReproduction's six single/array participant fields (eggDonorId, spermDonorId,
+        gestationalCarrierId, intendedParents[], donatedTo[], carriedFor[]) into one role-discriminated
+        child table, rather than six mostly-null columns on the parent row.
+      changes:
+        - createTable:
+            tableName: assisted_reproduction_participant
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_assisted_reproduction_participant
+                    nullable: false
+
+              - column:
+                  name: assisted_reproduction_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_assisted_reproduction_participant_assisted_reproduction
+                    references: assisted_reproduction(id)
+
+              - column:
+                  name: participant_role
+                  type: assisted_reproduction_participant_role
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: participant_person_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_assisted_reproduction_participant_person
+                    references: person(id)
+
+              - column:
+                  name: participant_family_member_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_assisted_reproduction_participant_family_member
+                    references: family_member(id)
+
+        - sql:
+            sql: |
+              ALTER TABLE assisted_reproduction_participant
+              ADD CONSTRAINT chk_assisted_reproduction_participant_owner_xor
+              CHECK (
+                (participant_person_id IS NOT NULL AND participant_family_member_id IS NULL) OR
+                (participant_person_id IS NULL AND participant_family_member_id IS NOT NULL)
+              );
+
+        - createIndex:
+            indexName: idx_assisted_reproduction_participant_assisted_reproduction_id
+            tableName: assisted_reproduction_participant
+            columns:
+              - column:
+                  name: assisted_reproduction_id
+
+      rollback:
+        - dropTable:
+            tableName: assisted_reproduction_participant

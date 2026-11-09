@@ -1,0 +1,169 @@
+databaseChangeLog:
+  - changeSet:
+      id: 016-create-sex-gender-relationship-enum-types
+      author: safiya
+      comment: >
+        Controlled vocabularies for the locked sex/gender model (QP-Pedigree-Schema-Design.md §3.2,
+        mentor-confirmed 2026-09-30) and for decoupling PARTNER_RELATIONSHIP's relationship status
+        from consanguinity (mentor review of QP-Pedigree-Demographic-Questions.md, 2026-10-14).
+      changes:
+        - sql:
+            sql: |
+              CREATE TYPE sex_assigned_at_birth_type AS ENUM ('UNKNOWN', 'MALE', 'FEMALE');
+              CREATE TYPE gender_identity_type AS ENUM ('MAN', 'WOMAN', 'NONBINARY', 'UNKNOWN');
+              CREATE TYPE relationship_status_type AS ENUM (
+                  'MARRIED', 'DIVORCED', 'SEPARATED', 'NEVER_MARRIED', 'WIDOWED', 'UNKNOWN'
+              );
+      rollback:
+        - sql:
+            sql: |
+              DROP TYPE IF EXISTS relationship_status_type;
+              DROP TYPE IF EXISTS gender_identity_type;
+              DROP TYPE IF EXISTS sex_assigned_at_birth_type;
+
+  - changeSet:
+      id: 016-alter-person-sex-gender-fields
+      author: safiya
+      comment: >
+        Replaces gender_at_birth with sex_assigned_at_birth (same 1:1 shape, no INTERSEX value -
+        intersex is annotation-only now). Reshapes gender_identity in place from free-text VARCHAR
+        to the structured enum (same column name, different type, per §3.2 - not kept alongside a
+        new one). Adds is_intersex (independent of both enums) and country_of_origin (ISO 3166-1
+        alpha-2, validated at the question-authoring layer via validation.pattern). No data
+        migration needed - this table is truncated before this changeset is applied.
+      changes:
+        - dropColumn:
+            tableName: person
+            columnName: gender_at_birth
+        - dropColumn:
+            tableName: person
+            columnName: gender_identity
+        - addColumn:
+            tableName: person
+            columns:
+              - column:
+                  name: sex_assigned_at_birth
+                  type: sex_assigned_at_birth_type
+              - column:
+                  name: gender_identity
+                  type: gender_identity_type
+              - column:
+                  name: is_intersex
+                  type: BOOLEAN
+              - column:
+                  name: country_of_origin
+                  type: VARCHAR
+      rollback:
+        - dropColumn:
+            tableName: person
+            columnName: country_of_origin
+        - dropColumn:
+            tableName: person
+            columnName: is_intersex
+        - dropColumn:
+            tableName: person
+            columnName: gender_identity
+        - dropColumn:
+            tableName: person
+            columnName: sex_assigned_at_birth
+        - addColumn:
+            tableName: person
+            columns:
+              - column:
+                  name: gender_identity
+                  type: VARCHAR
+              - column:
+                  name: gender_at_birth
+                  type: gender_at_birth_type
+
+  - changeSet:
+      id: 016-alter-family-member-sex-gender-fields
+      author: safiya
+      comment: Same reshape as person, applied to family_member - no data migration needed, table is truncated first.
+      changes:
+        - dropColumn:
+            tableName: family_member
+            columnName: gender_at_birth
+        - dropColumn:
+            tableName: family_member
+            columnName: gender_identity
+        - addColumn:
+            tableName: family_member
+            columns:
+              - column:
+                  name: sex_assigned_at_birth
+                  type: sex_assigned_at_birth_type
+              - column:
+                  name: gender_identity
+                  type: gender_identity_type
+              - column:
+                  name: is_intersex
+                  type: BOOLEAN
+              - column:
+                  name: country_of_origin
+                  type: VARCHAR
+      rollback:
+        - dropColumn:
+            tableName: family_member
+            columnName: country_of_origin
+        - dropColumn:
+            tableName: family_member
+            columnName: is_intersex
+        - dropColumn:
+            tableName: family_member
+            columnName: gender_identity
+        - dropColumn:
+            tableName: family_member
+            columnName: sex_assigned_at_birth
+        - addColumn:
+            tableName: family_member
+            columns:
+              - column:
+                  name: gender_identity
+                  type: VARCHAR
+              - column:
+                  name: gender_at_birth
+                  type: gender_at_birth_type
+
+  - changeSet:
+      id: 016-drop-gender-at-birth-type
+      author: safiya
+      comment: No column references gender_at_birth_type anymore (both prior changesets in this file drop it) - safe to drop the type itself.
+      changes:
+        - sql:
+            sql: DROP TYPE IF EXISTS gender_at_birth_type;
+      rollback:
+        - sql:
+            sql: CREATE TYPE gender_at_birth_type AS ENUM ('MALE', 'FEMALE', 'INTERSEX', 'UNKNOWN');
+
+  - changeSet:
+      id: 016-alter-partner-relationship-status-consanguinity
+      author: safiya
+      comment: >
+        Decouples consanguinity from mating_line_type (mentor review, 2026-10-14: "parents can be
+        married and biologically related at the same time - one field should not represent both
+        facts"). Adds relationship_status (marital/separation history, independently askable) and
+        consanguineous (boolean, independently askable). consanguinity_degree's required-when
+        condition moves from mating_line_type=CONSANGUINEOUS to consanguineous=true, enforced in
+        PartnerRelationshipService. mating_line_type itself is untouched - it stays exactly as it
+        is today (its own directly-settable field, still defaults to MATING_LINE) since it is the
+        literal pedigree-rendering code (pedigree-rendering-legend-pswg2022_simplify.json's
+        matingLineCode - a single visual line-style slot), and deriving it from the two new fields
+        is export-time logic, out of scope for this questionnaire-data-capture pass.
+      changes:
+        - addColumn:
+            tableName: partner_relationship
+            columns:
+              - column:
+                  name: relationship_status
+                  type: relationship_status_type
+              - column:
+                  name: consanguineous
+                  type: BOOLEAN
+      rollback:
+        - dropColumn:
+            tableName: partner_relationship
+            columnName: consanguineous
+        - dropColumn:
+            tableName: partner_relationship
+            columnName: relationship_status

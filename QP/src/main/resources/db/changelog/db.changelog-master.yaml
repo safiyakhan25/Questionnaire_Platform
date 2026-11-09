@@ -25,3 +25,35 @@ databaseChangeLog:
       file: db/changelog/changes/012-add-display-order-unique-constraints.yaml
   - include:
       file: db/changelog/changes/013-drop-question-disable-rule.yaml
+  - include:
+      file: db/changelog/changes/014-add-template-subject-scope-and-session-pause-resume.yaml
+  - include:
+      file: db/changelog/changes/015-create-relationship-tables.yaml
+  - include:
+      file: db/changelog/changes/016-add-sex-gender-model-and-relationship-status.yaml
+  - include:
+      file: db/changelog/changes/017-add-family-member-role-recursive-scope.yaml
+  - include:
+      file: db/changelog/changes/018-create-app-user-and-auth-token.yaml
+  - include:
+      file: db/changelog/changes/019-create-disease-catalog-table.yaml
+  - include:
+      file: db/changelog/changes/020-reshape-disease-and-mutation.yaml
+  - include:
+      file: db/changelog/changes/021-create-gender-transition-table.yaml
+  - include:
+      file: db/changelog/changes/022-create-twinship-tables.yaml
+  - include:
+      file: db/changelog/changes/023-create-adoption-tables.yaml
+  - include:
+      file: db/changelog/changes/024-create-pregnancy-outcome-table.yaml
+  - include:
+      file: db/changelog/changes/025-create-assisted-reproduction-tables.yaml
+  - include:
+      file: db/changelog/changes/026-replace-session-pause-resume-with-per-subject-position.yaml
+  - include:
+      file: db/changelog/changes/027-add-pregnancy-loss-relationship-type.yaml
+  - include:
+      file: db/changelog/changes/028-fix-pedigree-data-model-discrepancies.yaml
+  - include:
+      file: db/changelog/changes/029-add-field-config-to-question.yaml

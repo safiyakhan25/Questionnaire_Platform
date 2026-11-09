@@ -1,0 +1,55 @@
+databaseChangeLog:
+  - changeSet:
+      id: 019-create-disease-catalog-table
+      author: safiya
+      comment: >
+        Global, admin-managed catalog of disease types - every diagnosis a DISEASE row records
+        references one of these. Separate from the pedigree export's own per-document diseases[]
+        (<=4 "featured" entries with a rendering quadrant) - this catalog is unbounded and has no
+        quadrant of its own, per QP-Pedigree-Schema-Design.md §2.1.
+      changes:
+        - createTable:
+            tableName: disease_catalog
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_disease_catalog
+                    nullable: false
+
+              - column:
+                  name: name
+                  type: VARCHAR
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_disease_catalog_name
+
+              - column:
+                  name: abbreviation
+                  type: VARCHAR
+
+              - column:
+                  name: default_color
+                  type: VARCHAR
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+      rollback:
+        - dropTable:
+            tableName: disease_catalog

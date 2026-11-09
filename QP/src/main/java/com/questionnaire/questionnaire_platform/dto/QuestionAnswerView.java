@@ -17,6 +17,7 @@ public record QuestionAnswerView(
         JsonNode options,
         JsonNode validation,
         boolean visible,
-        JsonNode value
+        JsonNode value,
+        JsonNode fieldConfig
 ) {
 }

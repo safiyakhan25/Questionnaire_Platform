@@ -20,6 +20,7 @@ public record QuestionUpdateRequest(
 
         JsonNode options,
         JsonNode validation,
-        JsonNode visibilityRule
+        JsonNode visibilityRule,
+        JsonNode fieldConfig
 ) {
 }

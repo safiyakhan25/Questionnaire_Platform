@@ -1,0 +1,70 @@
+databaseChangeLog:
+  - changeSet:
+      id: 024-create-pregnancy-outcome-enum-type
+      author: safiya
+      comment: Controlled vocabulary for PREGNANCY_OUTCOME.outcome_type, per QP-Pedigree-Schema-Design.md §2.8.
+      changes:
+        - sql:
+            sql: |
+              CREATE TYPE pregnancy_outcome_type AS ENUM (
+                  'CURRENT_PREGNANCY', 'AFFECTED_PREGNANCY', 'PREGNANCY_LMP', 'SAB', 'SAB_AFFECTED',
+                  'TOP', 'TOP_AFFECTED', 'ECTOPIC', 'STILLBIRTH'
+              );
+      rollback:
+        - sql:
+            sql: DROP TYPE IF EXISTS pregnancy_outcome_type;
+
+  - changeSet:
+      id: 024-create-pregnancy-outcome-table
+      author: safiya
+      comment: >
+        A pregnancy loss or current pregnancy gets its own FAMILY_MEMBER row (never the proband), with
+        this table attached - at most one outcome record per family member. Maps to
+        individual.pregnancyOutcome (pedigree_schema.json).
+      changes:
+        - createTable:
+            tableName: pregnancy_outcome
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_pregnancy_outcome
+                    nullable: false
+
+              - column:
+                  name: family_member_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_pregnancy_outcome_family_member
+                    foreignKeyName: fk_pregnancy_outcome_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: outcome_type
+                  type: pregnancy_outcome_type
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: gestational_weeks
+                  type: INTEGER
+
+              - column:
+                  name: lmp_date
+                  type: DATE
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+      rollback:
+        - dropTable:
+            tableName: pregnancy_outcome

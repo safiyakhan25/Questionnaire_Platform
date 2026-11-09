@@ -26,10 +26,8 @@ public class FamilyMember {
     @JoinColumn(name = "proband_id", nullable = false)
     private Person proband;
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "relationship_type", nullable = false)
-    private RelationshipType relationshipType;
+    // relationship_type moved to FAMILY_MEMBER_ROLE (see FamilyMemberRole.java) - a single column
+    // here can't hold more than one true relational label once recursive adding is allowed.
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
@@ -50,11 +48,21 @@ public class FamilyMember {
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "gender_at_birth")
-    private GenderAtBirthType genderAtBirth;
+    @Column(name = "sex_assigned_at_birth")
+    private SexAssignedAtBirthType sexAssignedAtBirth;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "gender_identity")
-    private String genderIdentity;
+    private GenderIdentityType genderIdentity;
+
+    @Column(name = "is_intersex")
+    private Boolean isIntersex;
+
+    // ISO 3166-1 alpha-2 codes, array - see Person.countryOfOrigin's comment for why.
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "country_of_origin", columnDefinition = "text[]")
+    private String[] countryOfOrigin;
 
     @Column(name = "birth_date")
     private LocalDateTime birthDate;
@@ -106,4 +114,15 @@ public class FamilyMember {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // Where THIS family member's own pass currently is, for resume - independent of the proband's
+    // own position (QuestionnaireSession.previousTemplate) and of every other family member's. Null
+    // means this family member's pass hasn't started yet.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "current_template_id")
+    private Template currentTemplate;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "current_workflow_id")
+    private Workflow currentWorkflow;
 }

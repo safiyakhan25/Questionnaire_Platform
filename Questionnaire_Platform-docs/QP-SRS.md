@@ -4,8 +4,8 @@
 | | |
 |---|---|
 | **Document status** | Draft for review |
-| **Version** | 1.4 |
-| **Date** | 2026-09-15 (last revised 2026-09-21) |
+| **Version** | 1.6 |
+| **Date** | 2026-09-15 (last revised 2026-10-13 — backend audit pass) |
 | **Prepared by** | Safiya Khan |
 | **Project** | Questionnaire Platform (genetic-risk / family-history intake) |
 
@@ -190,16 +190,57 @@ Naming convention: resource names are plural for collection-level operations (cr
 
 ### 5.2 Assessment Execution APIs (Patient-Facing)
 
+**Note (2026-10-13):** this section was rewritten to match the actual implemented paths exactly, including several endpoints built after this SRS's last revision (FR-8/9 navigation and editing, the family-member/relationship CRUD beyond the original add/remove pair) that were never previously documented here. The family-member delete path in particular was previously documented as `/family-member/{id}` (singular) but is, and always was, `/family-members/{id}` (plural) — a doc/implementation mismatch, now corrected.
+
+#### Core assessment flow
+
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/v1/assessment/start` | Start a new session, or resume the existing `IN_PROGRESS` one for that person. Creates the session and a new `PERSON` on a fresh start; reuses the existing `person_id` on resume. Returns the current template's full question set, each one flagged visible or not-yet-visible, pre-filled with any answers on record. |
-| GET | `/api/v1/assessment/{sessionId}/current-template` | Idempotent fetch of the current template, resolved via `previous_template_id` — same shape as `POST /api/v1/assessment/start`. Used for page refreshes or reopening a session; reads only, changes nothing. |
-| POST | `/api/v1/assessment/{sessionId}/answer` | Submits one answer. Persists it as a `question_response` (stored value, not the display label) and updates the matching `PERSON`/`FAMILY_MEMBER` field. Triggers no re-evaluation (see FR-4) — nothing in the currently-rendered template can depend on it. Template completion is handled separately, by `next-template`. |
-| POST | `/api/v1/assessment/{sessionId}/next-template` | Explicit action (not auto-advance). Marks the current template complete, evaluates the next candidate template's rule (across workflows too), and returns the next template or a "session completed" signal. |
+| POST | `/api/v1/assessment/start` | Start a new session, or resume the existing `IN_PROGRESS` one for that person by passing its `sessionId`. Creates the session and a new `PERSON` on a fresh start; reuses the existing `person_id` on resume. A `sessionId` that doesn't resolve to an `IN_PROGRESS` session (completed, or unknown) is rejected (404), never silently resumed or duplicated. Returns the current template's full question set, each one flagged visible or not-yet-visible, pre-filled with any answers on record. |
+| GET | `/api/v1/assessment/{sessionId}/current-template` | Idempotent fetch of the current template for the session's active subject (the proband, or a family member mid-pass — see FR-12), resolved via `previous_template_id`. Read-only. |
+| POST | `/api/v1/assessment/{sessionId}/answer` | Submits one answer, for the active subject. Rejected (400) if the question's template isn't the session's actual current template — answering only ever happens against the position the session has legitimately reached, or a template explicitly resumed via `resume-here` below (see FR-9). Rejected (409) if the session is already `COMPLETED`. Persists a `question_response`, runs FR-15 validation first, and updates the matching `PERSON`/`FAMILY_MEMBER` field — or, for the reserved answer_keys `diseases`/`genetic_findings`, fully reconciles that subject's `DISEASE`/`MUTATION` rows against the submitted array (FR-3.2). Then runs the FR-9 downstream-invalidation cascade; the response's `invalidatedAnswerKeys` lists anything nullified as a side effect. |
+| POST | `/api/v1/assessment/{sessionId}/next-template` | Explicit action (not auto-advance). Rejected (409) if the current template still has required, visible, unanswered questions (FR-6). Otherwise evaluates the next candidate template's rule (across workflows too) and returns it, or a "session completed"/"family-member pass complete" signal (FR-12). |
 | GET | `/api/v1/assessment/{sessionId}` | Status only: in-progress/completed, started/finished timestamps. |
-| GET | `/api/v1/assessment/{sessionId}/responses` | Full readback of every answer given so far in the session. |
-| POST | `/api/v1/assessment/{sessionId}/family-members` | Starts a fresh pass through the Family Member questions for another relative. |
-| DELETE | `/api/v1/assessment/{sessionId}/family-member/{familyMemberId}` | Deletes a family member the patient added by mistake, before the questionnaire is completed. |
+| GET | `/api/v1/assessment/{sessionId}/responses` | Full readback of every answer given so far in the session, across every subject. |
+
+#### Previous/forward navigation and editing (FR-8, FR-9)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/assessment/{sessionId}/visited-templates` | The active subject's actual answered path — templates with at least one answer on record, ordered by when each was first answered. Never computed from `display_order` or current rules. |
+| GET | `/api/v1/assessment/{sessionId}/templates/{templateId}` | Read-only view of one previously visited template. Never moves the session's real position; browsing never submits or modifies anything (FR-8.3/8.5). Rejected (404) for a template the active subject never actually visited. |
+| POST | `/api/v1/assessment/{sessionId}/templates/{templateId}/resume-here` | "Go back to here" (FR-8.6) — the only action that moves the session's real position to an earlier template, which is what makes editing an answer there possible via the normal `/answer` endpoint afterward. Un-completes the session if it was `COMPLETED`. |
+
+#### Family-member management (FR-12, FR-13)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/v1/assessment/{sessionId}/family-members` | Creates a family member and immediately starts a fresh pass through whatever templates apply to family members (`SubjectScope.FAMILY_MEMBER_ONLY`/`BOTH`), pausing the proband's own position until that pass ends. Rejected (409) for a relationship type that's singular per proband (`MOTHER`/`FATHER`) if one already exists. Rejected (409) if a different family member's pass is already active, or the session is `COMPLETED`. |
+| GET | `/api/v1/assessment/{sessionId}/family-members` | List every family member added so far for this proband. |
+| GET | `/api/v1/assessment/{sessionId}/family-members/{familyMemberId}` | Get one family member. |
+| GET | `/api/v1/assessment/{sessionId}/family-members/reconciliation` | FR-13.2/13.3: compares a declared count (`PERSON.additionalFacts`, if ever collected) against the actual number of family members per relative group (siblings/children/aunts-uncles/cousins/nieces-nephews). Read-only — reports a mismatch, never blocks adding more. |
+| DELETE | `/api/v1/assessment/{sessionId}/family-members/{familyMemberId}` | Deletes a family member added by mistake. Rejected (409) if their pass is currently active, if they already have recorded answers, if they're referenced by a parent-child or partner relationship, or if the session is `COMPLETED`. |
+
+#### Family relationship persistence
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/v1/assessment/{sessionId}/relationships/parent-child` | Records a parent → child edge (the proband or a family member as parent; an existing family member, never the proband, as child). |
+| GET | `/api/v1/assessment/{sessionId}/relationships/parent-child` | List every parent-child edge recorded for this proband's pedigree. |
+| GET | `/api/v1/assessment/{sessionId}/relationships/parent-child/{relationshipId}` | Get one parent-child edge. |
+| DELETE | `/api/v1/assessment/{sessionId}/relationships/parent-child/{relationshipId}` | Deletes one parent-child edge. Rejected (409) if the session is `COMPLETED`. |
+| POST | `/api/v1/assessment/{sessionId}/relationships/partners` | Records a partner edge between two individuals (each the proband or a family member). Accepts `relationshipStatus` (marital/separation history) and `consanguineous` independently of `matingLineType` (the pedigree-rendering code, unasked by the current question set, left at its `MATING_LINE` default) — see `QP-Pedigree-Demographic-Questions.md`, 2026-10-14. Enforces the conditional field rules: `unshownChildrenCount` required for `HAS_CHILDREN_NOT_SHOWN`, `consanguinityDegree` required when `consanguineous = true`, `endedYear` only valid when `relationshipStatus` is `SEPARATED`/`DIVORCED` or `matingLineType` is `SEPARATED`/`DIVORCED`/`NO_LONGER_TOGETHER`. |
+| GET | `/api/v1/assessment/{sessionId}/relationships/partners` | List every partner edge recorded for this proband's pedigree. |
+| GET | `/api/v1/assessment/{sessionId}/relationships/partners/{relationshipId}` | Get one partner edge. |
+| DELETE | `/api/v1/assessment/{sessionId}/relationships/partners/{relationshipId}` | Deletes one partner edge. Rejected (409) if the session is `COMPLETED`. |
+
+Every endpoint in this section is scoped to its `sessionId`'s own proband — an id belonging to a different session's proband or family members is rejected (404), never silently accepted.
+
+#### Pedigree JSON export (2026-10-14 — "task 4" from the 2026-09-28 manager assignment)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/assessment/{sessionId}/pedigree-export` | Converts this session's proband + family graph into a document conforming to `pedigree_schema.json` (schemaVersion 4.0.0, the format the "PedigreeDraw" tool consumes). Read-only, available regardless of session status. See `QP-Pedigree-Export.md` for the full mapping, the v1 scope limitations (no disease/genetic-test data yet, Section G entities unbuilt), and the provisional `matingLineCode` derivation rule pending a mentor decision. |
 
 ---
 
@@ -338,22 +379,23 @@ A workflow can contain multiple templates. Each workflow has exactly one default
 
 ## 9. Current Implementation Status
 
-As of this revision (2026-09-21), the following is true of the codebase (distinct from the design decisions described above, which represent the target state):
+As of this revision (2026-10-13), the following is true of the codebase (distinct from the design decisions described above, which represent the target state):
 
 | Area | Status |
 |---|---|
-| Database schema (Liquibase migrations) | Implemented — `workflow`, `template`, `question`, `person`, `family_member`, `questionnaire_session`, `question_response`, `disease`, `mutation` tables exist, fully matching §4.1. `question.disable_rule` was dropped (changeset `013`) — see FR-10. |
-| `previous_template_id` / `previous_workflow_id` on `questionnaire_session` | Implemented. |
-| `template_id` on `question_response` | Implemented. |
-| `visibility_rule` on `question` | Implemented (single rule type — `disable_rule` removed, see FR-10). |
-| `additional_facts` on `person` / `family_member` | Implemented. |
-| `display_order` uniqueness (per parent: workflow-wide, per-workflow for template, per-template for question) | Implemented as a DB unique constraint plus a service-level check. |
-| JPA entities and repositories | Implemented for all 9 tables, fully matching the current schema. |
+| Database schema (Liquibase migrations) | Implemented — `workflow`, `template`, `question`, `person`, `family_member`, `questionnaire_session`, `question_response`, `disease`, `mutation` tables from §4.1, plus `parent_child_relationship`/`partner_relationship` (pedigree groundwork — persistence only, see below) and `subject_scope` on `template` / `current_family_member_id`+`return_template_id`+`return_workflow_id` on `questionnaire_session` (the family-member pause/resume model, see FR-12). `question.disable_rule` was dropped (changeset `013`) — see FR-10. |
+| JPA entities and repositories | Implemented for every table above. |
 | Rule Engine | Implemented (`engine/RuleEngine`) — wraps `io.github.jamsesso:json-logic-java`, same library/contract as the `rule-engine-poc` proof of concept. |
-| Workflow Engine, Template Engine | Not implemented as separate components — their responsibilities (template resolution, navigation) currently live inside `AssessmentService`, which is small enough at this scope not to need the split yet. |
-| Admin/Configuration APIs (§5.1) | Fully implemented and live-tested — all 15 Workflow/Template/Question CRUD endpoints. |
-| Assessment Execution APIs (§5.2) | Core execution loop implemented and live-tested: `start` (create-or-resume-by-sessionId), `current-template`, `answer`, `next-template`, session `status`, `responses`. **Not yet implemented**: family-member management (FR-12/13/14), previous/forward browsing and the edit-and-nullify cascade (FR-8/9), signed-cookie session identification (FR-16 — `sessionId` is currently a plain field/path parameter), and returning-patient matching by identifying field (FR-17). |
-| Seed data | No Liquibase seed migration. Workflow/Template/Question configuration is seeded by calling the admin APIs (§5.1). |
+| `AnswerValidator` (FR-15) | Implemented and wired into `/answer` — the full named-key vocabulary (`required`/`minLength`/`maxLength`/`min`/`max`/`pattern`), per-type checks, and allowed-values checking against `question.options`. |
+| `ConfigurationValidator` | Implemented and wired into the Template/Question admin APIs — validates `templateRule`/`visibilityRule` are structurally valid JsonLogic, `validation` uses only the known key vocabulary with correctly-typed values and non-contradictory bounds, and `options` entries are well-formed, all at save time rather than only failing later at runtime. |
+| `PersonAnswerWriter` / `FamilyMemberAnswerWriter` | Implemented — one answer_key to one fixed column, with unrecognized keys falling into `additional_facts`. |
+| `DiseaseAnswerWriter` / `MutationAnswerWriter` (FR-3.2) | Implemented — the reserved answer_keys `diseases`/`genetic_findings` take a JSON array and fully reconcile that subject's `DISEASE`/`MUTATION` rows against it on every submission (so edit/clear both work through the same mechanism as every other answer). Built against the current schema shape (`disease_type`/`age_at_diagnosis`; `gene`/`mutation`) — the pedigree-driven reshape (ontology codes, `DISEASE_CATALOG`, `result`/`variant`/`testType`) is deferred. |
+| Workflow Engine, Template Engine | Not implemented as separate components — their responsibilities (template resolution, navigation, subject-scope filtering) live inside `AssessmentService`. |
+| Admin/Configuration APIs (§5.1) | Fully implemented and live-tested — all 15 Workflow/Template/Question CRUD endpoints, now with `ConfigurationValidator` wired in. |
+| Assessment Execution APIs (§5.2) | Fully implemented and live-tested: core loop (`start`/`current-template`/`answer`/`next-template`/`status`/`responses`), FR-6 (required-question template-completion gating), FR-8/FR-9 (previous/forward browsing, resume-at-template, and the downstream-invalidation cascade), FR-12/13 (family-member add-and-pass, delete, singular-type duplicate prevention, count reconciliation), and relationship persistence (`parent_child_relationship`/`partner_relationship` CRUD — the edges only; the pedigree JSON export/mapper itself is a separate, not-yet-started effort). Session/request integrity hardened: answers are rejected unless they target the template the session has actually, legitimately reached, and every mutating endpoint rejects a `COMPLETED` session except `resume-here`, the one designated path to un-complete it. |
+| **Not yet implemented** | FR-14 (reference-token linking a family member to their own later proband session) and FR-16/FR-17 (signed-cookie session identification; returning-patient matching by email/phone) — each explicitly deferred as a separate, conditionally-worded ("if required") feature, not a gap found by accident. Without FR-16/17, there is no way to recognize a returning caller, so "prevent accidental duplicate session creation" has a structural limit: resuming by an already-known `sessionId` is solid, but nothing can stop two *fresh* `/start` calls (no `sessionId` given) from creating two sessions. |
+| Automated tests | Implemented — 97 tests across unit (`RuleEngine`, `AnswerValidator`, `ConfigurationValidator`, `PersonAnswerWriter`/`FamilyMemberAnswerWriter`, `DiseaseAnswerWriter`/`MutationAnswerWriter`, the last two Mockito-based and proving transactional consistency via `verifyNoInteractions` on a malformed mid-array entry) and integration layers (real `questionnaire_platform_test` Postgres database, `@Transactional` auto-rollback per test, confirmed empty after full suite runs — covers question visibility/navigation, FR-6, FR-8/FR-9, FR-12/FR-13 including reconciliation, relationship persistence, admin CRUD duplicate-prevention and delete-blocking, config validation wired through the real service layer, invalid-request/missing-entity handling via MockMvc, and one full end-to-end scenario with a conditional template and a family member through real HTTP). Verified against a database wiped to empty (`DROP SCHEMA public CASCADE`) and rebuilt by Liquibase from nothing, twice, with identical results both times. |
+| Seed data | No Liquibase seed migration. Workflow/Template/Question configuration is seeded by calling the admin APIs (§5.1) — confirmed (`AdminConfigurationIntegrationTest`) that re-running the same seed call against existing configuration is rejected (409) at every level (workflow/template/question, by code and by displayOrder), never silently duplicated. |
 
 ---
 
@@ -376,6 +418,12 @@ Every functional requirement in §6 is derived directly from a specific source d
 
 ## 11. Open Issues (Require Further Decision Before Implementation)
 
-No open issues remain as of this revision (2026-09-16). The six items originally listed here — template dependency validation mechanism, family member/existing person matching, returning-patient identity matching, `validation` JSONB structure, the meaning of "nullify" under append-only responses, and the viewing-to-editing submission path — were all resolved on 2026-09-16 and are now reflected in FR-9, FR-11, FR-14, FR-15, and FR-17.
+No open issues remained as of 2026-09-16 (see prior revisions for the six items resolved then). As of this revision (2026-10-13):
+
+- **FR-14, FR-16, FR-17 are deliberately unimplemented**, not overlooked — each was confirmed with the user as out of scope for now (conditionally worded, "if required," in the engineering audit that drove 2026-10-12/13's work), being a genuinely separate feature with its own design surface (token generation/redemption and data-merge semantics for FR-14; cookie issuance and a shift in how every endpoint resolves session identity for FR-16; an identifying-field lookup and confirm-before-link flow for FR-17). Picking any of them back up needs its own design pass, not just "finish the endpoint." One structural consequence, unresolved without FR-16/17: resuming by an already-known `sessionId` is solid, but nothing can recognize a returning caller across two *fresh* `/start` calls (no `sessionId` given), so accidental duplicate sessions from that specific path remain possible.
+- **FR-4 and FR-11 have no dedicated tests, by design, not by omission.** FR-4 (no re-evaluation within a template) is true by the absence of any such code path — there is nothing to assert against. FR-11 (a rule may only reference an earlier template) is an authoring convention enforced by documentation, not runtime validation, per the SRS's own original decision (§6, FR-11) — so there is no runtime behavior to test either. Both are confirmed by code inspection and architecture, not by a test asserting a negative.
+- **Pedigree export is separate from pedigree-ready persistence.** `parent_child_relationship`/`partner_relationship` (the relationship *edges*) are implemented and tested; the JSON mapper/export that assembles them (plus `DISEASE`/`MUTATION`/`FAMILY_MEMBER` data) into the external PedigreeDraw tool's schema has not been started, by explicit instruction, pending further Phase 1B schema work (`DISEASE_CATALOG`, the sex/gender model split, `GENDER_TRANSITION`, etc. — tracked in `QP-Pedigree-Schema-Design.md`, not this document).
+
+Resolved as of this revision: the automated-test-suite gap flagged in the 2026-10-13 (earlier) revision of this section is closed — see §9's "Automated tests" row.
 
 Future gaps identified during implementation should be added to this section following the same pattern: stated as an open constraint, never answered by assumption.

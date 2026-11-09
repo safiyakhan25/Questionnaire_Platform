@@ -43,6 +43,14 @@ public class Template {
     @Column(name = "template_rule", columnDefinition = "jsonb")
     private String templateRule;
 
+    // Who this template is collected for: PROBAND_ONLY (default, unchanged behavior), FAMILY_MEMBER_ONLY
+    // (e.g. Pregnancy Outcome - never applies to the proband), or BOTH (e.g. Basic Details, reused as-is
+    // for every family member's pass instead of being duplicated into a second workflow/template).
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "subject_scope", nullable = false)
+    private SubjectScope subjectScope;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

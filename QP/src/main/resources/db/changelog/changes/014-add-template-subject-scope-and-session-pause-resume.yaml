@@ -1,0 +1,77 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-add-template-subject-scope-type
+      author: safiya
+      comment: subject_scope controls who a template is collected for - PROBAND_ONLY (today's default, unchanged behavior), FAMILY_MEMBER_ONLY (e.g. Pregnancy Outcome - never applies to the proband themselves), or BOTH (e.g. Basic Details, reused as-is rather than duplicated per workflow).
+      changes:
+        - sql:
+            sql: |
+              CREATE TYPE subject_scope AS ENUM ('PROBAND_ONLY', 'FAMILY_MEMBER_ONLY', 'BOTH');
+      rollback:
+        - sql:
+            sql: |
+              DROP TYPE IF EXISTS subject_scope;
+
+  - changeSet:
+      id: 014-add-template-subject-scope-column
+      author: safiya
+      comment: Defaults every existing template to PROBAND_ONLY, preserving current behavior until an admin explicitly opts a template into FAMILY_MEMBER_ONLY or BOTH.
+      changes:
+        - addColumn:
+            tableName: template
+            columns:
+              - column:
+                  name: subject_scope
+                  type: subject_scope
+                  defaultValue: PROBAND_ONLY
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: template
+            columnName: subject_scope
+
+  - changeSet:
+      id: 014-add-session-family-member-pause-resume-columns
+      author: safiya
+      comment: >
+        current_family_member_id = whose pass is currently active (null = the proband's own walk,
+        using previous_template_id/previous_workflow_id as always). When set, previous_template_id/
+        previous_workflow_id instead track position within THIS family member's pass, and
+        return_template_id/return_workflow_id hold the proband's own paused position, restored when
+        the family member's pass is exhausted. Single active subject at a time - no stack, so a
+        second family member's pass cannot start until the current one finishes.
+      changes:
+        - addColumn:
+            tableName: questionnaire_session
+            columns:
+              - column:
+                  name: current_family_member_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_questionnaire_session_current_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: return_template_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_questionnaire_session_return_template
+                    references: template(id)
+
+              - column:
+                  name: return_workflow_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_questionnaire_session_return_workflow
+                    references: workflow(id)
+      rollback:
+        - dropColumn:
+            tableName: questionnaire_session
+            columnName: current_family_member_id
+        - dropColumn:
+            tableName: questionnaire_session
+            columnName: return_template_id
+        - dropColumn:
+            tableName: questionnaire_session
+            columnName: return_workflow_id

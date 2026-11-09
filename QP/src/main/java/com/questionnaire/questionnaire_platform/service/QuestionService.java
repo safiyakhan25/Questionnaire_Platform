@@ -3,6 +3,7 @@ package com.questionnaire.questionnaire_platform.service;
 import com.questionnaire.questionnaire_platform.dto.QuestionCreateRequest;
 import com.questionnaire.questionnaire_platform.dto.QuestionDto;
 import com.questionnaire.questionnaire_platform.dto.QuestionUpdateRequest;
+import com.questionnaire.questionnaire_platform.engine.ConfigurationValidator;
 import com.questionnaire.questionnaire_platform.entity.Question;
 import com.questionnaire.questionnaire_platform.entity.Template;
 import com.questionnaire.questionnaire_platform.exception.DuplicateResourceException;
@@ -26,10 +27,13 @@ public class QuestionService {
     private final QuestionRepository questionRepository;
     private final TemplateRepository templateRepository;
     private final JsonColumnMapper jsonColumnMapper;
+    private final ConfigurationValidator configurationValidator;
 
     @Transactional
     public QuestionDto create(UUID templateId, QuestionCreateRequest request) {
         Template template = findTemplateOrThrow(templateId);
+        configurationValidator.validateRule(request.visibilityRule(), "visibilityRule");
+        configurationValidator.validateForType(request.type(), request.validation(), request.options(), request.fieldConfig());
 
         if (questionRepository.existsByAnswerKey(request.answerKey())) {
             throw new DuplicateResourceException(
@@ -50,6 +54,7 @@ public class QuestionService {
         question.setOptions(jsonColumnMapper.write(request.options()));
         question.setValidation(jsonColumnMapper.write(request.validation()));
         question.setVisibilityRule(jsonColumnMapper.write(request.visibilityRule()));
+        question.setFieldConfig(jsonColumnMapper.write(request.fieldConfig()));
 
         return toDto(questionRepository.save(question));
     }
@@ -68,6 +73,8 @@ public class QuestionService {
     @Transactional
     public QuestionDto update(UUID id, QuestionUpdateRequest request) {
         Question question = findQuestionOrThrow(id);
+        configurationValidator.validateRule(request.visibilityRule(), "visibilityRule");
+        configurationValidator.validateForType(request.type(), request.validation(), request.options(), request.fieldConfig());
         if (questionRepository.existsByTemplateIdAndDisplayOrderAndIdNot(
                 question.getTemplate().getId(), request.displayOrder(), id)) {
             throw new DuplicateResourceException(
@@ -80,6 +87,7 @@ public class QuestionService {
         question.setOptions(jsonColumnMapper.write(request.options()));
         question.setValidation(jsonColumnMapper.write(request.validation()));
         question.setVisibilityRule(jsonColumnMapper.write(request.visibilityRule()));
+        question.setFieldConfig(jsonColumnMapper.write(request.fieldConfig()));
 
         return toDto(question);
     }

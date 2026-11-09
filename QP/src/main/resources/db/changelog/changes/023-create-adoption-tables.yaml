@@ -1,0 +1,148 @@
+databaseChangeLog:
+  - changeSet:
+      id: 023-create-adoption-enum-type
+      author: safiya
+      comment: Controlled vocabulary for ADOPTION.adoption_type, per QP-Pedigree-Schema-Design.md §2.7.
+      changes:
+        - sql:
+            sql: CREATE TYPE adoption_type AS ENUM ('ADOPTED_IN', 'ADOPTED_OUT');
+      rollback:
+        - sql:
+            sql: DROP TYPE IF EXISTS adoption_type;
+
+  - changeSet:
+      id: 023-create-adoption-table
+      author: safiya
+      comment: One row per adopted individual. Maps to individual.adoption (pedigree_schema.json).
+      changes:
+        - createTable:
+            tableName: adoption
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_adoption
+                    nullable: false
+
+              - column:
+                  name: proband_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_adoption_proband
+                    references: person(id)
+
+              - column:
+                  name: individual_person_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_adoption_individual_person
+                    references: person(id)
+
+              - column:
+                  name: individual_family_member_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_adoption_individual_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: adoption_type
+                  type: adoption_type
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - sql:
+            sql: |
+              ALTER TABLE adoption
+              ADD CONSTRAINT chk_adoption_individual_xor
+              CHECK (
+                (individual_person_id IS NOT NULL AND individual_family_member_id IS NULL) OR
+                (individual_person_id IS NULL AND individual_family_member_id IS NOT NULL)
+              );
+
+        - createIndex:
+            indexName: idx_adoption_proband_id
+            tableName: adoption
+            columns:
+              - column:
+                  name: proband_id
+
+      rollback:
+        - dropTable:
+            tableName: adoption
+
+  - changeSet:
+      id: 023-create-adoption-parent-table
+      author: safiya
+      comment: >
+        Adoptive parents only (up to 2, per pedigree_schema.json's adoptiveParents maxItems). Biological
+        parents are NOT stored here - they are already captured via PARENT_CHILD_RELATIONSHIP/
+        FAMILY_MEMBER_ROLE for the same individual (the same source the pedigree export already reads
+        to build that person's parents[]), so a separate BIOLOGICAL row here would be duplicate data
+        with no independent source of truth. adoption.biologicalParents is computed at export time from
+        that existing graph instead.
+      changes:
+        - createTable:
+            tableName: adoption_parent
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_adoption_parent
+                    nullable: false
+
+              - column:
+                  name: adoption_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_adoption_parent_adoption
+                    references: adoption(id)
+
+              - column:
+                  name: parent_person_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_adoption_parent_parent_person
+                    references: person(id)
+
+              - column:
+                  name: parent_family_member_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_adoption_parent_parent_family_member
+                    references: family_member(id)
+
+        - sql:
+            sql: |
+              ALTER TABLE adoption_parent
+              ADD CONSTRAINT chk_adoption_parent_parent_xor
+              CHECK (
+                (parent_person_id IS NOT NULL AND parent_family_member_id IS NULL) OR
+                (parent_person_id IS NULL AND parent_family_member_id IS NOT NULL)
+              );
+
+        - createIndex:
+            indexName: idx_adoption_parent_adoption_id
+            tableName: adoption_parent
+            columns:
+              - column:
+                  name: adoption_id
+
+      rollback:
+        - dropTable:
+            tableName: adoption_parent

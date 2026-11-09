@@ -28,3 +28,9 @@ spring:
 logging:
   level:
     liquibase: INFO
+
+pedigree:
+  render:
+    service:
+      base-url: http://localhost:8082
+      timeout-ms: 10000

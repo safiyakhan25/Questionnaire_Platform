@@ -3,6 +3,8 @@ package com.questionnaire.questionnaire_platform.service;
 import com.questionnaire.questionnaire_platform.dto.TemplateCreateRequest;
 import com.questionnaire.questionnaire_platform.dto.TemplateResponse;
 import com.questionnaire.questionnaire_platform.dto.TemplateUpdateRequest;
+import com.questionnaire.questionnaire_platform.engine.ConfigurationValidator;
+import com.questionnaire.questionnaire_platform.entity.SubjectScope;
 import com.questionnaire.questionnaire_platform.entity.Template;
 import com.questionnaire.questionnaire_platform.entity.Workflow;
 import com.questionnaire.questionnaire_platform.exception.DuplicateResourceException;
@@ -27,10 +29,12 @@ public class TemplateService {
     private final TemplateRepository templateRepository;
     private final WorkflowRepository workflowRepository;
     private final JsonColumnMapper jsonColumnMapper;
+    private final ConfigurationValidator configurationValidator;
 
     @Transactional
     public TemplateResponse create(UUID workflowId, TemplateCreateRequest request) {
         Workflow workflow = findWorkflowOrThrow(workflowId);
+        configurationValidator.validateRule(request.templateRule(), "templateRule");
 
         if (templateRepository.existsByCode(request.code())) {
             throw new DuplicateResourceException("A template with code '" + request.code() + "' already exists");
@@ -48,6 +52,7 @@ public class TemplateService {
         template.setDescription(request.description());
         template.setDisplayOrder(request.displayOrder());
         template.setTemplateRule(jsonColumnMapper.write(request.templateRule()));
+        template.setSubjectScope(request.subjectScope() != null ? request.subjectScope() : SubjectScope.PROBAND_ONLY);
         LocalDateTime now = LocalDateTime.now();
         template.setCreatedAt(now);
         template.setUpdatedAt(now);
@@ -69,6 +74,7 @@ public class TemplateService {
     @Transactional
     public TemplateResponse update(UUID id, TemplateUpdateRequest request) {
         Template template = findTemplateOrThrow(id);
+        configurationValidator.validateRule(request.templateRule(), "templateRule");
         if (templateRepository.existsByWorkflowIdAndDisplayOrderAndIdNot(
                 template.getWorkflow().getId(), request.displayOrder(), id)) {
             throw new DuplicateResourceException(
@@ -79,6 +85,7 @@ public class TemplateService {
         template.setDescription(request.description());
         template.setDisplayOrder(request.displayOrder());
         template.setTemplateRule(jsonColumnMapper.write(request.templateRule()));
+        template.setSubjectScope(request.subjectScope());
         template.setUpdatedAt(LocalDateTime.now());
 
         return toResponse(template);

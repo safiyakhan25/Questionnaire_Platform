@@ -1,7 +1,8 @@
 package com.questionnaire.questionnaire_platform.engine;
 
-import com.questionnaire.questionnaire_platform.entity.GenderAtBirthType;
+import com.questionnaire.questionnaire_platform.entity.GenderIdentityType;
 import com.questionnaire.questionnaire_platform.entity.Person;
+import com.questionnaire.questionnaire_platform.entity.SexAssignedAtBirthType;
 import com.questionnaire.questionnaire_platform.exception.InvalidAnswerException;
 import com.questionnaire.questionnaire_platform.util.JsonColumnMapper;
 import lombok.RequiredArgsConstructor;
@@ -31,8 +32,10 @@ public class PersonAnswerWriter {
             case "middle_name" -> person.setMiddleName(text(value));
             case "last_name" -> person.setLastName(text(value));
             case "preferred_name" -> person.setPreferredName(text(value));
-            case "gender_at_birth" -> person.setGenderAtBirth(enumValue(answerKey, value, GenderAtBirthType.class));
-            case "gender_identity" -> person.setGenderIdentity(text(value));
+            case "sex_assigned_at_birth" -> person.setSexAssignedAtBirth(enumValue(answerKey, value, SexAssignedAtBirthType.class));
+            case "gender_identity" -> person.setGenderIdentity(enumValue(answerKey, value, GenderIdentityType.class));
+            case "is_intersex" -> person.setIsIntersex(value == null || value.isNull() ? null : value.asBoolean());
+            case "country_of_origin" -> person.setCountryOfOrigin(stringArray(value));
             case "birth_date" -> person.setBirthDate(dateTime(answerKey, value));
             case "marital_status" -> person.setMaritalStatus(text(value));
             case "communication_language" -> person.setCommunicationLanguage(text(value));

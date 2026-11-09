@@ -39,12 +39,25 @@ public class Person {
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "gender_at_birth")
-    private GenderAtBirthType genderAtBirth;
+    @Column(name = "sex_assigned_at_birth")
+    private SexAssignedAtBirthType sexAssignedAtBirth;
 
-    // Deliberately VARCHAR, not a lookup-table FK: the answer is captured verbatim from the questionnaire response, no separate ID needed. Confirmed with mentor 2026-08-13.
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "gender_identity")
-    private String genderIdentity;
+    private GenderIdentityType genderIdentity;
+
+    // Independent of sexAssignedAtBirth/genderIdentity - intersex is annotation-only, never a value
+    // of either enum. QP-Pedigree-Schema-Design.md §3.2.
+    @Column(name = "is_intersex")
+    private Boolean isIntersex;
+
+    // ISO 3166-1 alpha-2 codes, one per country of family origin (ancestry can span more than one) -
+    // array, matching race/ethnicity's own TEXT[] convention on this table. Per-code format enforced
+    // at the question-authoring layer (validation.pattern), not here.
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "country_of_origin", columnDefinition = "text[]")
+    private String[] countryOfOrigin;
 
     @Column(name = "birth_date")
     private LocalDateTime birthDate;

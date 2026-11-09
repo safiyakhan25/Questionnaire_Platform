@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 027-add-pregnancy-loss-relationship-type
+      author: safiya
+      comment: >
+        Without this, there was no way to create the FAMILY_MEMBER row a PREGNANCY_OUTCOME record
+        attaches to - a pregnancy loss before sex is known doesn't fit SON/DAUGHTER, and every other
+        existing relationship_type value assumes a born individual. Additive-only: existing values
+        are untouched.
+      changes:
+        - sql:
+            sql: ALTER TYPE relationship_type ADD VALUE IF NOT EXISTS 'PREGNANCY_LOSS';
+      rollback:
+        - sql:
+            sql: SELECT 1 -- Postgres cannot drop a single enum value; not expected to be rolled back

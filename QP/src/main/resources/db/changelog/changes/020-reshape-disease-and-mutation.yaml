@@ -1,0 +1,140 @@
+databaseChangeLog:
+  - changeSet:
+      id: 020-create-disease-and-mutation-enum-types
+      author: safiya
+      comment: Controlled vocabularies for the ontology-coded DISEASE/MUTATION reshape, per QP-Pedigree-Schema-Design.md §2.4/§2.5.
+      changes:
+        - sql:
+            sql: |
+              CREATE TYPE disease_code_system_type AS ENUM ('ICD_10', 'ICD_O_3', 'OMIM', 'HPO', 'SNOMED_CT', 'CUSTOM');
+              CREATE TYPE disease_laterality_type AS ENUM ('LEFT', 'RIGHT', 'BILATERAL');
+              CREATE TYPE disease_status_type AS ENUM ('CONFIRMED', 'SUSPECTED', 'REPORTED');
+              CREATE TYPE mutation_result_type AS ENUM (
+                  'PATHOGENIC', 'LIKELY_PATHOGENIC', 'VUS', 'LIKELY_BENIGN', 'BENIGN', 'NEGATIVE', 'PENDING'
+              );
+              CREATE TYPE genetic_test_type AS ENUM ('SINGLE_GENE', 'PANEL', 'WES', 'WGS', 'TARGETED');
+      rollback:
+        - sql:
+            sql: |
+              DROP TYPE IF EXISTS genetic_test_type;
+              DROP TYPE IF EXISTS mutation_result_type;
+              DROP TYPE IF EXISTS disease_status_type;
+              DROP TYPE IF EXISTS disease_laterality_type;
+              DROP TYPE IF EXISTS disease_code_system_type;
+
+  - changeSet:
+      id: 020-reshape-disease-table
+      author: safiya
+      comment: >
+        Replaces free-text disease_type with ontology coding (code_system/code_id/code_label) plus
+        laterality/status, and links every diagnosis to the admin-managed DISEASE_CATALOG. DISEASE
+        has 0 rows in every environment at the time of this change - no backfill needed.
+      changes:
+        - dropColumn:
+            tableName: disease
+            columnName: disease_type
+        - addColumn:
+            tableName: disease
+            columns:
+              - column:
+                  name: disease_catalog_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_disease_disease_catalog
+                    references: disease_catalog(id)
+              - column:
+                  name: code_system
+                  type: disease_code_system_type
+                  constraints:
+                    nullable: false
+              - column:
+                  name: code_id
+                  type: VARCHAR
+                  constraints:
+                    nullable: false
+              - column:
+                  name: code_label
+                  type: VARCHAR
+              - column:
+                  name: laterality
+                  type: disease_laterality_type
+              - column:
+                  name: status
+                  type: disease_status_type
+                  constraints:
+                    nullable: false
+        - createIndex:
+            indexName: idx_disease_disease_catalog_id
+            tableName: disease
+            columns:
+              - column:
+                  name: disease_catalog_id
+      rollback:
+        - dropColumn:
+            tableName: disease
+            columnName: status
+        - dropColumn:
+            tableName: disease
+            columnName: laterality
+        - dropColumn:
+            tableName: disease
+            columnName: code_label
+        - dropColumn:
+            tableName: disease
+            columnName: code_id
+        - dropColumn:
+            tableName: disease
+            columnName: code_system
+        - dropColumn:
+            tableName: disease
+            columnName: disease_catalog_id
+        - addColumn:
+            tableName: disease
+            columns:
+              - column:
+                  name: disease_type
+                  type: VARCHAR
+
+  - changeSet:
+      id: 020-reshape-mutation-table
+      author: safiya
+      comment: >
+        Replaces the free-text mutation column with a structured genetic-test result (result/variant/
+        test_type), per QP-Pedigree-Schema-Design.md §2.5. MUTATION has 0 rows in every environment
+        at the time of this change - no backfill needed. Table name is unchanged; its semantics going
+        forward are "genetic test result", not just "a mutation".
+      changes:
+        - dropColumn:
+            tableName: mutation
+            columnName: mutation
+        - addColumn:
+            tableName: mutation
+            columns:
+              - column:
+                  name: result
+                  type: mutation_result_type
+                  constraints:
+                    nullable: false
+              - column:
+                  name: variant
+                  type: VARCHAR
+              - column:
+                  name: test_type
+                  type: genetic_test_type
+      rollback:
+        - dropColumn:
+            tableName: mutation
+            columnName: test_type
+        - dropColumn:
+            tableName: mutation
+            columnName: variant
+        - dropColumn:
+            tableName: mutation
+            columnName: result
+        - addColumn:
+            tableName: mutation
+            columns:
+              - column:
+                  name: mutation
+                  type: VARCHAR

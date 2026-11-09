@@ -1,0 +1,127 @@
+databaseChangeLog:
+  - changeSet:
+      id: 022-create-twinship-enum-type
+      author: safiya
+      comment: Controlled vocabulary for TWINSHIP.twin_type, per QP-Pedigree-Schema-Design.md §2.6.
+      changes:
+        - sql:
+            sql: |
+              CREATE TYPE twin_type AS ENUM (
+                  'MONOZYGOTIC', 'DIZYGOTIC', 'ZYGOSITY_UNKNOWN', 'HIGHER_ORDER_MULTIPLE', 'CONJOINED'
+              );
+      rollback:
+        - sql:
+            sql: DROP TYPE IF EXISTS twin_type;
+
+  - changeSet:
+      id: 022-create-twinship-table
+      author: safiya
+      comment: >
+        One row per twin GROUP (2 for twins, 3+ for higher-order multiples) - the zygosity/type is a
+        fact about the twinning event, shared by every co-twin, so it lives here rather than being
+        duplicated on each member. Maps to individual.twinship (pedigree_schema.json).
+      changes:
+        - createTable:
+            tableName: twinship
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_twinship
+                    nullable: false
+
+              - column:
+                  name: proband_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_twinship_proband
+                    references: person(id)
+
+              - column:
+                  name: twin_type
+                  type: twin_type
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            indexName: idx_twinship_proband_id
+            tableName: twinship
+            columns:
+              - column:
+                  name: proband_id
+
+      rollback:
+        - dropTable:
+            tableName: twinship
+
+  - changeSet:
+      id: 022-create-twinship-member-table
+      author: safiya
+      comment: >
+        Membership in a twin group - all rows sharing one twinship_id are each other's coTwins at
+        export time.
+      changes:
+        - createTable:
+            tableName: twinship_member
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_twinship_member
+                    nullable: false
+
+              - column:
+                  name: twinship_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_twinship_member_twinship
+                    references: twinship(id)
+
+              - column:
+                  name: person_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_twinship_member_person
+                    references: person(id)
+
+              - column:
+                  name: family_member_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_twinship_member_family_member
+                    references: family_member(id)
+
+        - sql:
+            sql: |
+              ALTER TABLE twinship_member
+              ADD CONSTRAINT chk_twinship_member_owner_xor
+              CHECK (
+                (person_id IS NOT NULL AND family_member_id IS NULL) OR
+                (person_id IS NULL AND family_member_id IS NOT NULL)
+              );
+
+        - createIndex:
+            indexName: idx_twinship_member_twinship_id
+            tableName: twinship_member
+            columns:
+              - column:
+                  name: twinship_id
+
+      rollback:
+        - dropTable:
+            tableName: twinship_member

@@ -10,6 +10,10 @@ public record AnswerSubmitRequest(
         UUID questionId,
 
         @NotNull(message = "value is required")
-        JsonNode value
+        JsonNode value,
+
+        // Null = this answer is about the proband (existing behavior). Set = the answer is
+        // about this specific family member instead; must belong to the session's own proband.
+        UUID familyMemberId
 ) {
 }

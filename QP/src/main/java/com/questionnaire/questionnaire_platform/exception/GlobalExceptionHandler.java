@@ -43,6 +43,23 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(InvalidRelationshipException.class)
+    public ResponseEntity<ApiError> handleInvalidRelationship(InvalidRelationshipException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidConfigurationException.class)
+    public ResponseEntity<ApiError> handleInvalidConfiguration(InvalidConfigurationException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    // 409, not 400: the request itself (no body) is well-formed - it's current session state
+    // (missing required answers) that blocks it, the same reasoning as ResourceInUseException.
+    @ExceptionHandler(TemplateIncompleteException.class)
+    public ResponseEntity<ApiError> handleTemplateIncomplete(TemplateIncompleteException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(RuleEvaluationException.class)
     public ResponseEntity<ApiError> handleRuleEvaluation(RuleEvaluationException ex, HttpServletRequest request) {
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Rule evaluation failed: " + ex.getMessage(), request);
@@ -51,6 +68,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, "Malformed request body", request);
+    }
+
+    @ExceptionHandler(InvalidPedigreeFormatException.class)
+    public ResponseEntity<ApiError> handleInvalidPedigreeFormat(InvalidPedigreeFormatException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(PedigreeServiceUnavailableException.class)
+    public ResponseEntity<ApiError> handlePedigreeServiceUnavailable(PedigreeServiceUnavailableException ex, HttpServletRequest request) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidPedigreeDocumentException.class)
+    public ResponseEntity<ApiError> handleInvalidPedigreeDocument(InvalidPedigreeDocumentException ex, HttpServletRequest request) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(PedigreeRenderFailedException.class)
+    public ResponseEntity<ApiError> handlePedigreeRenderFailed(PedigreeRenderFailedException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_GATEWAY, ex.getMessage(), request);
     }
 
     private ResponseEntity<ApiError> build(HttpStatus status, String message, HttpServletRequest request) {

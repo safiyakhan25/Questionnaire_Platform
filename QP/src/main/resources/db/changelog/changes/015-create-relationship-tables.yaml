@@ -1,0 +1,221 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-create-relationship-enum-types
+      author: safiya
+      comment: Controlled vocabularies for PARTNER_RELATIONSHIP, per QP-Pedigree-Schema-Design.md §2.3.
+      changes:
+        - sql:
+            sql: |
+              CREATE TYPE mating_line_type AS ENUM (
+                  'MATING_LINE', 'CONSANGUINEOUS', 'SEPARATED', 'DIVORCED', 'NO_LONGER_TOGETHER', 'CASUAL_OR_UNKNOWN'
+              );
+              CREATE TYPE reproductive_status_type AS ENUM (
+                  'HAS_CHILDREN', 'HAS_CHILDREN_NOT_SHOWN', 'NO_OFFSPRING', 'INFERTILE',
+                  'NO_ISSUE_BY_CHOICE', 'PREGNANCY_ONLY', 'UNKNOWN'
+              );
+      rollback:
+        - sql:
+            sql: |
+              DROP TYPE IF EXISTS reproductive_status_type;
+              DROP TYPE IF EXISTS mating_line_type;
+
+  - changeSet:
+      id: 015-create-parent-child-relationship-table
+      author: safiya
+      comment: >
+        One edge, parent -> child, scoped to one proband's pedigree. parent_person_id/
+        parent_family_member_id is XOR (the parent is the proband or a family member) - the
+        proband is never the child here, that link already exists via FAMILY_MEMBER.relationship_type.
+        Siblings/half-siblings are NOT stored - derived at export time from shared parent edges.
+      changes:
+        - createTable:
+            tableName: parent_child_relationship
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_parent_child_relationship
+                    nullable: false
+
+              - column:
+                  name: proband_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_parent_child_relationship_proband
+                    references: person(id)
+
+              - column:
+                  name: parent_person_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_parent_child_relationship_parent_person
+                    references: person(id)
+
+              - column:
+                  name: parent_family_member_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_parent_child_relationship_parent_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: child_family_member_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_parent_child_relationship_child_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - sql:
+            sql: |
+              ALTER TABLE parent_child_relationship
+              ADD CONSTRAINT chk_parent_child_relationship_parent_xor
+              CHECK (
+                (parent_person_id IS NOT NULL AND parent_family_member_id IS NULL) OR
+                (parent_person_id IS NULL AND parent_family_member_id IS NOT NULL)
+              );
+
+        - createIndex:
+            indexName: idx_parent_child_relationship_proband_id
+            tableName: parent_child_relationship
+            columns:
+              - column:
+                  name: proband_id
+
+        - createIndex:
+            indexName: idx_parent_child_relationship_child_family_member_id
+            tableName: parent_child_relationship
+            columns:
+              - column:
+                  name: child_family_member_id
+
+      rollback:
+        - dropTable:
+            tableName: parent_child_relationship
+
+  - changeSet:
+      id: 015-create-partner-relationship-table
+      author: safiya
+      comment: >
+        One partner/mating-line edge, scoped to one proband's pedigree. person_a/person_b are
+        each XOR (proband or family member). unshown_children_count/consanguinity_degree/
+        ended_year are each conditionally required/valid depending on mating_line_type/
+        reproductive_status - enforced in PartnerRelationshipService, not a DB constraint.
+      changes:
+        - createTable:
+            tableName: partner_relationship
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_partner_relationship
+                    nullable: false
+
+              - column:
+                  name: proband_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_partner_relationship_proband
+                    references: person(id)
+
+              - column:
+                  name: person_a_person_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_partner_relationship_person_a_person
+                    references: person(id)
+
+              - column:
+                  name: person_a_family_member_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_partner_relationship_person_a_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: person_b_person_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_partner_relationship_person_b_person
+                    references: person(id)
+
+              - column:
+                  name: person_b_family_member_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_partner_relationship_person_b_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: mating_line_type
+                  type: mating_line_type
+                  defaultValue: MATING_LINE
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: reproductive_status
+                  type: reproductive_status_type
+                  defaultValue: UNKNOWN
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: unshown_children_count
+                  type: INTEGER
+
+              - column:
+                  name: consanguinity_degree
+                  type: VARCHAR
+
+              - column:
+                  name: ended_year
+                  type: INTEGER
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - sql:
+            sql: |
+              ALTER TABLE partner_relationship
+              ADD CONSTRAINT chk_partner_relationship_person_a_xor
+              CHECK (
+                (person_a_person_id IS NOT NULL AND person_a_family_member_id IS NULL) OR
+                (person_a_person_id IS NULL AND person_a_family_member_id IS NOT NULL)
+              );
+              ALTER TABLE partner_relationship
+              ADD CONSTRAINT chk_partner_relationship_person_b_xor
+              CHECK (
+                (person_b_person_id IS NOT NULL AND person_b_family_member_id IS NULL) OR
+                (person_b_person_id IS NULL AND person_b_family_member_id IS NOT NULL)
+              );
+
+        - createIndex:
+            indexName: idx_partner_relationship_proband_id
+            tableName: partner_relationship
+            columns:
+              - column:
+                  name: proband_id
+
+      rollback:
+        - dropTable:
+            tableName: partner_relationship

@@ -1,0 +1,79 @@
+databaseChangeLog:
+  - changeSet:
+      id: 018-create-app-user-and-auth-token
+      author: safiya
+      comment: APP_USER/AUTH_TOKEN - a new, additive-only patient login module. session_id has no FK - it references questionnaire_session in a different bounded context and this table must not couple to it.
+
+      changes:
+        - createTable:
+            tableName: app_user
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_app_user
+                    nullable: false
+
+              - column:
+                  name: email
+                  type: VARCHAR
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_app_user_email
+
+              - column:
+                  name: phone
+                  type: VARCHAR
+
+              - column:
+                  name: password_hash
+                  type: VARCHAR
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: session_id
+                  type: UUID
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - createTable:
+            tableName: auth_token
+            columns:
+              - column:
+                  name: token
+                  type: VARCHAR
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_auth_token
+                    nullable: false
+
+              - column:
+                  name: app_user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_auth_token_app_user
+                    references: app_user(id)
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+      rollback:
+        - dropTable:
+            tableName: auth_token
+        - dropTable:
+            tableName: app_user

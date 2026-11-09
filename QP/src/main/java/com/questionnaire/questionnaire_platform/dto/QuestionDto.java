@@ -18,7 +18,8 @@ public record QuestionDto(
         Integer displayOrder,
         JsonNode options,
         JsonNode validation,
-        JsonNode visibilityRule
+        JsonNode visibilityRule,
+        JsonNode fieldConfig
 ) {
     public static QuestionDto from(Question question, JsonColumnMapper jsonColumnMapper) {
         return new QuestionDto(
@@ -30,7 +31,8 @@ public record QuestionDto(
                 question.getDisplayOrder(),
                 jsonColumnMapper.read(question.getOptions()),
                 jsonColumnMapper.read(question.getValidation()),
-                jsonColumnMapper.read(question.getVisibilityRule())
+                jsonColumnMapper.read(question.getVisibilityRule()),
+                jsonColumnMapper.read(question.getFieldConfig())
         );
     }
 }

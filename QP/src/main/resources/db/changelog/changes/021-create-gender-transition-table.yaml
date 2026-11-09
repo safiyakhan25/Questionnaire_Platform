@@ -1,0 +1,86 @@
+databaseChangeLog:
+  - changeSet:
+      id: 021-create-gender-transition-table
+      author: safiya
+      comment: >
+        Maps to individual.genderTransition (pedigree_schema.json) - optional, at most one record per
+        individual. Reuses gender_identity_type (MAN/WOMAN/NONBINARY/UNKNOWN) for from_gender/to_gender,
+        same vocabulary as PERSON/FAMILY_MEMBER.gender_identity, per QP-Pedigree-Schema-Design.md §2.10.
+      changes:
+        - createTable:
+            tableName: gender_transition
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_gender_transition
+                    nullable: false
+
+              - column:
+                  name: person_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_gender_transition_person
+                    references: person(id)
+
+              - column:
+                  name: family_member_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_gender_transition_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: from_gender
+                  type: gender_identity_type
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: to_gender
+                  type: gender_identity_type
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: transition_year
+                  type: INTEGER
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - sql:
+            sql: |
+              ALTER TABLE gender_transition
+              ADD CONSTRAINT chk_gender_transition_owner_xor
+              CHECK (
+                (person_id IS NOT NULL AND family_member_id IS NULL) OR
+                (person_id IS NULL AND family_member_id IS NOT NULL)
+              );
+
+        - createIndex:
+            indexName: uq_gender_transition_person_id
+            tableName: gender_transition
+            unique: true
+            columns:
+              - column:
+                  name: person_id
+
+        - createIndex:
+            indexName: uq_gender_transition_family_member_id
+            tableName: gender_transition
+            unique: true
+            columns:
+              - column:
+                  name: family_member_id
+
+      rollback:
+        - dropTable:
+            tableName: gender_transition

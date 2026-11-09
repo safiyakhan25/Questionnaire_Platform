@@ -55,4 +55,10 @@ public class Question {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "visibility_rule", columnDefinition = "jsonb")
     private String visibilityRule;
+
+    // Only set for STRUCTURED questions: {shape: "object"|"list", fields: [...]} - see
+    // docs/superpowers/specs/2026-11-01-structured-pedigree-questions-design.md §4.2.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "field_config", columnDefinition = "jsonb")
+    private String fieldConfig;
 }

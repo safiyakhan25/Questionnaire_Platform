@@ -1,0 +1,61 @@
+databaseChangeLog:
+  - changeSet:
+      id: 028-convert-country-of-origin-to-array
+      author: safiya
+      comment: >
+        country_of_origin was always meant to be an array of ISO 3166-1 alpha-2 codes (ancestry can
+        span more than one country) - it was a single VARCHAR in error. Matches the existing
+        TEXT[] convention already used for race/ethnicity on these same tables. Existing single-value
+        rows are wrapped into one-element arrays rather than dropped.
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE person
+              ALTER COLUMN country_of_origin TYPE TEXT[]
+              USING (CASE WHEN country_of_origin IS NULL THEN NULL ELSE ARRAY[country_of_origin] END);
+              ALTER TABLE family_member
+              ALTER COLUMN country_of_origin TYPE TEXT[]
+              USING (CASE WHEN country_of_origin IS NULL THEN NULL ELSE ARRAY[country_of_origin] END);
+      rollback:
+        - sql:
+            sql: |
+              ALTER TABLE person
+              ALTER COLUMN country_of_origin TYPE VARCHAR
+              USING (CASE WHEN country_of_origin IS NULL THEN NULL ELSE country_of_origin[1] END);
+              ALTER TABLE family_member
+              ALTER COLUMN country_of_origin TYPE VARCHAR
+              USING (CASE WHEN country_of_origin IS NULL THEN NULL ELSE country_of_origin[1] END);
+
+  - changeSet:
+      id: 028-add-missing-not-null-constraints
+      author: safiya
+      comment: >
+        family_member.created_at/updated_at and mutation.gene were always meant to be NOT NULL
+        (every write path already sets them) but the constraint was never actually added. No
+        existing row violates this (verified before writing this changeset).
+      changes:
+        - addNotNullConstraint:
+            tableName: family_member
+            columnName: created_at
+            columnDataType: TIMESTAMP
+        - addNotNullConstraint:
+            tableName: family_member
+            columnName: updated_at
+            columnDataType: TIMESTAMP
+        - addNotNullConstraint:
+            tableName: mutation
+            columnName: gene
+            columnDataType: VARCHAR
+      rollback:
+        - dropNotNullConstraint:
+            tableName: family_member
+            columnName: created_at
+            columnDataType: TIMESTAMP
+        - dropNotNullConstraint:
+            tableName: family_member
+            columnName: updated_at
+            columnDataType: TIMESTAMP
+        - dropNotNullConstraint:
+            tableName: mutation
+            columnName: gene
+            columnDataType: VARCHAR

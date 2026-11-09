@@ -1,0 +1,12 @@
+# Runs the real app (not the JUnit suite) for the Playwright E2E harness. Points at the dev
+# database, not questionnaire_platform_test, because the test DB only ever holds transactional,
+# rolled-back JUnit fixtures and has no seeded templates/questions/workflow for a patient to
+# answer through - the dev DB is the only place that content currently exists. Each E2E run
+# creates one throwaway patient account (a timestamped, never-reused email) in this DB; nothing
+# existing is modified. Revisit if this DB's volume of accumulated test accounts becomes a problem.
+server:
+  port: 8081
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/questionnaire_platform_final

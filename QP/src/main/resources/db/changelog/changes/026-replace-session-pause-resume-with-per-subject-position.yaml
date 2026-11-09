@@ -1,0 +1,74 @@
+databaseChangeLog:
+  - changeSet:
+      id: 026-drop-app-user-and-auth-token
+      author: safiya
+      comment: Auth removed entirely - the proband is the only operator, no account to authenticate.
+      changes:
+        - dropTable:
+            tableName: auth_token
+        - dropTable:
+            tableName: app_user
+      rollback:
+        - sql:
+            sql: SELECT 1 -- irreversible without re-adding 018's full table definitions; not expected to be rolled back
+
+  - changeSet:
+      id: 026-drop-session-pause-resume-columns
+      author: safiya
+      comment: >
+        Replaces the single active-subject pause/resume pair with per-subject position (see next
+        changeset) - the proband's own previous_template_id/previous_workflow_id are untouched by
+        this change and now permanently belong only to the proband.
+      changes:
+        - dropColumn:
+            tableName: questionnaire_session
+            columnName: current_family_member_id
+        - dropColumn:
+            tableName: questionnaire_session
+            columnName: return_template_id
+        - dropColumn:
+            tableName: questionnaire_session
+            columnName: return_workflow_id
+      rollback:
+        - addColumn:
+            tableName: questionnaire_session
+            columns:
+              - column:
+                  name: current_family_member_id
+                  type: UUID
+              - column:
+                  name: return_template_id
+                  type: UUID
+              - column:
+                  name: return_workflow_id
+                  type: UUID
+
+  - changeSet:
+      id: 026-add-family-member-position-columns
+      author: safiya
+      comment: >
+        Each family member now owns its own position, independent of the proband's and of every
+        other family member's - null means that family member's pass hasn't started yet.
+      changes:
+        - addColumn:
+            tableName: family_member
+            columns:
+              - column:
+                  name: current_template_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_family_member_current_template
+                    references: template(id)
+              - column:
+                  name: current_workflow_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_family_member_current_workflow
+                    references: workflow(id)
+      rollback:
+        - dropColumn:
+            tableName: family_member
+            columnName: current_workflow_id
+        - dropColumn:
+            tableName: family_member
+            columnName: current_template_id

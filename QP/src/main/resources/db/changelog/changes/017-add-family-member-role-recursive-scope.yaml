@@ -1,0 +1,115 @@
+databaseChangeLog:
+  - changeSet:
+      id: 017-create-family-member-role-table
+      author: safiya
+      comment: >
+        QP-Family-Relationship-Persistence-Design.md. Moves relationship_type off FAMILY_MEMBER
+        entirely - once recursive adding is allowed (any family member can be the scope/anchor for
+        adding further relatives, not just the proband), the same real person can legitimately hold
+        more than one true relational label (e.g. SPOUSE relative to the father's scope, MOTHER
+        relative to the proband's scope), which a single column on the person's own row can never
+        represent. One row per role instead, same XOR-scope idiom already used by
+        PARENT_CHILD_RELATIONSHIP/PARTNER_RELATIONSHIP, not a JSONB blob - keeps a real FK and a
+        real ENUM instead of losing DB-level type safety.
+      changes:
+        - createTable:
+            tableName: family_member_role
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_family_member_role
+                    nullable: false
+
+              - column:
+                  name: family_member_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_family_member_role_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: scope_person_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_family_member_role_scope_person
+                    references: person(id)
+
+              - column:
+                  name: scope_family_member_id
+                  type: UUID
+                  constraints:
+                    foreignKeyName: fk_family_member_role_scope_family_member
+                    references: family_member(id)
+
+              - column:
+                  name: relationship_type
+                  type: relationship_type
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - sql:
+            sql: |
+              ALTER TABLE family_member_role
+              ADD CONSTRAINT chk_family_member_role_scope_xor
+              CHECK (
+                (scope_person_id IS NOT NULL AND scope_family_member_id IS NULL) OR
+                (scope_person_id IS NULL AND scope_family_member_id IS NOT NULL)
+              );
+
+        - createIndex:
+            indexName: idx_family_member_role_family_member_id
+            tableName: family_member_role
+            columns:
+              - column:
+                  name: family_member_id
+
+        - createIndex:
+            indexName: idx_family_member_role_scope_person_id
+            tableName: family_member_role
+            columns:
+              - column:
+                  name: scope_person_id
+
+        - createIndex:
+            indexName: idx_family_member_role_scope_family_member_id
+            tableName: family_member_role
+            columns:
+              - column:
+                  name: scope_family_member_id
+
+      rollback:
+        - dropTable:
+            tableName: family_member_role
+
+  - changeSet:
+      id: 017-drop-family-member-relationship-type-column
+      author: safiya
+      comment: >
+        Superseded by family_member_role - no column references removed here beyond this one
+        (maternal_paternal_side stays, it is proband-relative and unaffected by scope). No data
+        migration needed, this table is truncated before this changeset is applied.
+      changes:
+        - dropColumn:
+            tableName: family_member
+            columnName: relationship_type
+      rollback:
+        - addColumn:
+            tableName: family_member
+            columns:
+              - column:
+                  name: relationship_type
+                  type: relationship_type
+                  constraints:
+                    nullable: false

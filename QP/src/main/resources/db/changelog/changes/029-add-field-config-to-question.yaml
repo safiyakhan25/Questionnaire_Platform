@@ -1,0 +1,35 @@
+databaseChangeLog:
+  - changeSet:
+      id: 029-add-field-config-to-question
+      author: safiya
+      comment: >
+        Backs the new STRUCTURED question type: a flat or repeatable set of sub-fields (shape,
+        fields[]) describing how to render and submit a structured answer - see
+        docs/superpowers/specs/2026-11-01-structured-pedigree-questions-design.md.
+      changes:
+        - addColumn:
+            tableName: question
+            columns:
+              - column:
+                  name: field_config
+                  type: JSONB
+                  constraints:
+                    nullable: true
+      rollback:
+        - dropColumn:
+            tableName: question
+            columnName: field_config
+
+  - changeSet:
+      id: 029-add-structured-question-type
+      author: safiya
+      comment: >
+        question.type is backed by a native Postgres enum (question_type), not a plain varchar -
+        adding QuestionType.STRUCTURED on the Java side alone is not enough. Same idiom as
+        027-add-pregnancy-loss-relationship-type.yaml. Additive-only: existing values untouched.
+      changes:
+        - sql:
+            sql: ALTER TYPE question_type ADD VALUE IF NOT EXISTS 'STRUCTURED';
+      rollback:
+        - sql:
+            sql: SELECT 1 -- Postgres cannot drop a single enum value; not expected to be rolled back

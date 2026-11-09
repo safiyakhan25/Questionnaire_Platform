@@ -27,8 +27,10 @@ public class PersonFactsMapper {
         facts.put("middle_name", person.getMiddleName());
         facts.put("last_name", person.getLastName());
         facts.put("preferred_name", person.getPreferredName());
-        facts.put("gender_at_birth", person.getGenderAtBirth() == null ? null : person.getGenderAtBirth().name());
-        facts.put("gender_identity", person.getGenderIdentity());
+        facts.put("sex_assigned_at_birth", person.getSexAssignedAtBirth() == null ? null : person.getSexAssignedAtBirth().name());
+        facts.put("gender_identity", person.getGenderIdentity() == null ? null : person.getGenderIdentity().name());
+        facts.put("is_intersex", person.getIsIntersex());
+        facts.put("country_of_origin", person.getCountryOfOrigin());
         facts.put("birth_date", person.getBirthDate() == null ? null : person.getBirthDate().toString());
         facts.put("marital_status", person.getMaritalStatus());
         facts.put("communication_language", person.getCommunicationLanguage());

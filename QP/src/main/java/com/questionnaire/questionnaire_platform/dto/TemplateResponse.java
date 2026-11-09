@@ -1,5 +1,6 @@
 package com.questionnaire.questionnaire_platform.dto;
 
+import com.questionnaire.questionnaire_platform.entity.SubjectScope;
 import com.questionnaire.questionnaire_platform.entity.Template;
 import com.questionnaire.questionnaire_platform.util.JsonColumnMapper;
 import tools.jackson.databind.JsonNode;
@@ -15,6 +16,7 @@ public record TemplateResponse(
         String description,
         Integer displayOrder,
         JsonNode templateRule,
+        SubjectScope subjectScope,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -27,6 +29,7 @@ public record TemplateResponse(
                 template.getDescription(),
                 template.getDisplayOrder(),
                 jsonColumnMapper.read(template.getTemplateRule()),
+                template.getSubjectScope(),
                 template.getCreatedAt(),
                 template.getUpdatedAt()
         );

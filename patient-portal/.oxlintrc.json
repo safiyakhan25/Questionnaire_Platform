@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "oxc"],
+  "ignorePatterns": [
+    "src/components/base/**",
+    "src/components/application/**",
+    "src/components/foundations/**",
+    "src/components/shared-assets/**",
+    "src/providers/theme-provider.tsx",
+    "src/hooks/use-breakpoint.ts",
+    "src/hooks/use-clipboard.ts",
+    "src/hooks/use-resize-observer.ts",
+    "src/utils/cx.ts",
+    "src/utils/is-react-component.ts"
+  ],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+  }
+}
